@@ -48,15 +48,11 @@
             getAuth, signInAnonymously, onAuthStateChanged,
             getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp
         };
-
-        // Signal that Firebase is ready by dispatching a custom event
-        document.dispatchEvent(new Event('FirebaseReady'));
     </script>
 
     <!-- React App Code -->
     <script type="text/babel">
-        // Wait for the FirebaseReady event before trying to render the app
-        document.addEventListener('FirebaseReady', () => {
+        window.onload = function() {
             const { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp } = window.Firebase;
             const { useState, useEffect, useRef } = React;
 
@@ -725,7 +721,7 @@
 
             const root = ReactDOM.createRoot(document.getElementById('root'));
             root.render(<App />);
-        });
+        };
     </script>
 </body>
 </html>
