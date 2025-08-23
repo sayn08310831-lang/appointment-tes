@@ -34,7 +34,7 @@
     
     <!-- React and Babel -->
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react.dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <!-- Japanese Holidays Library -->
     <script src="https://cdn.jsdelivr.net/npm/japanese-holidays@1.0.10/lib/japanese-holidays.min.js"></script>
@@ -75,7 +75,7 @@
             auth = getAuth(app);
         } catch(e) { console.error("Firebase Init Error:", e); }
         
-        // --- ALL COMPONENTS AND HELPER FUNCTIONS (DEFINED BEFORE APP) ---
+        // --- ALL COMPONENTS AND HELPER FUNCTIONS (YOUR LATEST CODE) ---
         const UserIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>;
         const LocationIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>;
         const BackIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" /></svg>;
@@ -125,49 +125,8 @@
             useEffect(() => { const now = new Date(); const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000); const current = appointments.filter(app => app.visitStartTimestamp?.toDate() > oneHourAgo); const filtered = current.filter(app => (!filterDate || app.visitStartTimestamp?.toDate().toISOString().split('T')[0] === filterDate) && (!filterSalesPerson || app.salesPerson === filterSalesPerson)); setFilteredAppointments(filtered); }, [appointments, filterDate, filterSalesPerson]);
             const handleTeamIdSubmit = (id) => { localStorage.setItem('sales-app-team-id', id); setTeamId(id); };
             const handleChangeTeamId = () => { if (window.confirm('チームIDを変更しますか？')) { localStorage.removeItem('sales-app-team-id'); setTeamId(''); resetForm(); } };
-            
-            const proceedWithSubmission = async (appointmentData) => {
-                if (!teamId) return;
-                const collectionName = `${teamId}_appointments`;
-                try {
-                    if (editingId) {
-                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, editingId), { ...appointmentData, updatedAt: serverTimestamp() });
-                    } else {
-                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', collectionName), { ...appointmentData, createdAt: serverTimestamp() });
-                    }
-                    resetForm();
-                } catch (error) {
-                    console.error("Submission Error:", error);
-                    alert('保存エラーが発生しました。');
-                }
-            };
-
-            const handleSubmit = async (e) => {
-                e.preventDefault();
-                if (!customerName || !visitDate || !visitStartTime || !purpose || !salesPerson) { alert('必須項目が未入力です'); return; }
-                const newStartTimestamp = new Date(`${visitDate}T${visitStartTime}`);
-                const newEndTimestamp = visitEndTime ? new Date(`${visitDate}T${visitEndTime}`) : newStartTimestamp;
-                
-                const conflicting = appointments.find(app => {
-                    if (editingId && app.id === editingId) return false;
-                    if (app.salesPerson !== salesPerson) return false;
-                    // Timestamps on Firestore can be null temporarily, so check for existence
-                    if (!app.visitStartTimestamp || !app.visitStartTimestamp.toDate) return false;
-                    const existingStart = app.visitStartTimestamp.toDate();
-                    const existingEnd = app.visitEndTimestamp?.toDate() || existingStart;
-                    return newStartTimestamp < existingEnd && newEndTimestamp > existingStart;
-                });
-                
-                const appointmentData = { customerName, contactPerson, address, visitStartTimestamp: newStartTimestamp, visitEndTimestamp: newEndTimestamp, purpose, salesPerson, authorId: user?.uid };
-
-                if (conflicting) {
-                    setPendingAppointment(appointmentData);
-                    setModalMessage(`警告: ${salesPerson}さんには同時間帯に別のアポイントがあります。\n顧客: ${conflicting.customerName}`);
-                    setIsModalOpen(true);
-                } else {
-                    await proceedWithSubmission(appointmentData);
-                }
-            };
+            const proceedWithSubmission = async (appointmentData) => { if (!teamId) return; const collectionName = `${teamId}_appointments`; try { if (editingId) { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, editingId), { ...appointmentData, updatedAt: serverTimestamp() }); } else { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', collectionName), { ...appointmentData, createdAt: serverTimestamp() }); } resetForm(); } catch (error) { console.error(error); alert('保存エラー'); } };
+            const handleSubmit = async (e) => { e.preventDefault(); if (!customerName || !visitDate || !visitStartTime || !purpose || !salesPerson) { alert('必須項目が未入力です'); return; } const newStartTimestamp = new Date(`${visitDate}T${visitStartTime}`); const newEndTimestamp = visitEndTime ? new Date(`${visitDate}T${visitEndTime}`) : newStartTimestamp; const conflicting = appointments.find(app => !(editingId && app.id === editingId) && app.salesPerson === salesPerson && newStartTimestamp < app.visitStartTimestamp.toDate() && newEndTimestamp > app.visitStartTimestamp.toDate()); const appointmentData = { customerName, contactPerson, address, visitStartTimestamp: newStartTimestamp, visitEndTimestamp: newEndTimestamp, purpose, salesPerson, authorId: user?.uid }; if (conflicting) { setPendingAppointment(appointmentData); setModalMessage(`警告: ${salesPerson}さんには同時間帯に別のアポがあります。\n顧客: ${conflicting.customerName}`); setIsModalOpen(true); } else { await proceedWithSubmission(appointmentData); } };
             const handleConfirmSubmit = async () => { if (pendingAppointment) { await proceedWithSubmission(pendingAppointment); } setIsModalOpen(false); setPendingAppointment(null); };
             const handleCancelSubmit = () => { setIsModalOpen(false); setPendingAppointment(null); };
             const handleEdit = (appointment) => { const toDate = (d) => d.toISOString().split('T')[0]; const toTime = (d) => `${('0'+d.getHours()).slice(-2)}:${('0'+d.getMinutes()).slice(-2)}`; setView('main'); setTimeout(() => { setEditingId(appointment.id); setCustomerName(appointment.customerName); setContactPerson(appointment.contactPerson || ''); setAddress(appointment.address || ''); const start = appointment.visitStartTimestamp.toDate(); setVisitDate(toDate(start)); setVisitStartTime(toTime(start)); setVisitEndTime(appointment.visitEndTimestamp ? toTime(appointment.visitEndTimestamp.toDate()) : ''); setPurpose(appointment.purpose); setSalesPerson(appointment.salesPerson); formRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 0); };
