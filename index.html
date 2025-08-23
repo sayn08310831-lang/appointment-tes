@@ -82,6 +82,8 @@
             auth = getAuth(app);
         } catch(e) { console.error("Firebase initialization failed", e); }
         
+        // --- ALL COMPONENTS AND FUNCTIONS MUST BE DEFINED *BEFORE* THE MAIN APP COMPONENT ---
+        
         // --- SVG Icons ---
         const UserIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>;
         const LocationIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>;
@@ -112,7 +114,7 @@
             if (app.visitEndTimestamp) {
                 endDate = app.visitEndTimestamp.toDate();
             } else {
-                endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+                endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // Default to 1 hour
             }
             const toLocalFormat = (date) => {
                 const YYYY = date.getFullYear();
@@ -120,7 +122,8 @@
                 const DD = ('0' + date.getDate()).slice(-2);
                 const hh = ('0' + date.getHours()).slice(-2);
                 const mm = ('0' + date.getMinutes()).slice(-2);
-                return `${YYYY}${MM}${DD}T${hh}${mm}00`;
+                const ss = ('0' + date.getSeconds()).slice(-2);
+                return `${YYYY}${MM}${DD}T${hh}${mm}${ss}`;
             };
             const dates = `${toLocalFormat(startDate)}/${toLocalFormat(endDate)}`;
             const details = `目的: ${app.purpose}\n担当: ${app.salesPerson}\n連絡先: ${app.contactPerson || '未入力'}`;
@@ -140,22 +143,22 @@
                 return 'text-rose-600';
             }
             const day = date.getDay();
-            if (day === 0) return 'text-rose-600';
-            if (day === 6) return 'text-sky-600';
-            return 'text-slate-800';
+            if (day === 0) return 'text-rose-600'; // Sunday
+            if (day === 6) return 'text-sky-600';   // Saturday
+            return 'text-slate-800'; // Weekday
         };
 
         // --- Components ---
         const ConfirmationModal = ({ isOpen, message, onConfirm, onCancel }) => {
             if (!isOpen) return null;
             return (
-                <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-2xl p-6 sm:p-8 max-w-sm w-full text-center">
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4 transition-opacity">
+                    <div className="bg-white rounded-xl shadow-2xl p-6 sm:p-8 max-w-sm w-full text-center transform transition-all scale-100">
                         <h3 className="text-xl font-bold text-slate-800 mb-4">重複の確認</h3>
                         <p className="text-slate-600 whitespace-pre-wrap mb-6">{message}</p>
                         <div className="flex justify-center space-x-4">
-                            <button onClick={onCancel} className="w-full px-4 py-2.5 bg-slate-200 text-slate-800 font-semibold rounded-lg hover:bg-slate-300">キャンセル</button>
-                            <button onClick={onConfirm} className="w-full px-4 py-2.5 bg-rose-600 text-white font-semibold rounded-lg hover:bg-rose-700">このまま登録</button>
+                            <button onClick={onCancel} className="w-full px-4 py-2.5 bg-slate-200 text-slate-800 font-semibold rounded-lg hover:bg-slate-300 transition focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2">キャンセル</button>
+                            <button onClick={onConfirm} className="w-full px-4 py-2.5 bg-rose-600 text-white font-semibold rounded-lg hover:bg-rose-700 transition focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2">このまま登録</button>
                         </div>
                     </div>
                 </div>
@@ -174,9 +177,10 @@
                         <h1 className="text-3xl font-bold text-slate-800 mb-2">ようこそ</h1>
                         <p className="text-slate-600 mb-8">チームで決めた「共有ID」を入力して開始してください。</p>
                         <form onSubmit={handleSubmit}>
-                            <input type="text" value={inputTeamId} onChange={(e) => setInputTeamId(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-lg" placeholder="例: team-okayama" required />
-                            <button type="submit" className="w-full mt-6 bg-sky-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-sky-700">アプリを開始</button>
+                            <input type="text" value={inputTeamId} onChange={(e) => setInputTeamId(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition text-center text-lg shadow-inner" placeholder="例: team-okayama" required />
+                            <button type="submit" className="w-full mt-6 bg-sky-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-transform transform hover:scale-105 shadow-lg">アプリを開始</button>
                         </form>
+                        <p className="text-xs text-slate-400 mt-8">共有IDは、チームのデータを一意に識別するためのものです。チーム全員で同じIDを使用してください。</p>
                     </div>
                 </div>
             );
@@ -188,23 +192,24 @@
             
             const handleAddToCalendar = (e) => {
                 e.stopPropagation();
-                window.open(generateGoogleCalendarLink(app), '_blank', 'noopener,noreferrer');
+                const url = generateGoogleCalendarLink(app);
+                window.open(url, '_blank', 'noopener,noreferrer');
             };
 
             return (
-                <div className={`bg-white border p-5 rounded-xl shadow-sm ${!isPast && 'hover:shadow-lg'}`}>
+                <div className={`bg-white border border-slate-200 p-5 rounded-xl shadow-sm transition-shadow duration-300 ${!isPast && 'hover:shadow-lg'}`}>
                     <div className="flex justify-between items-start">
                         <div>
-                            {(!isDetailPage || isPast) && <p className={`font-semibold ${isPast ? 'text-slate-500' : dateColorClass}`}>{date}</p>}
+                            {(!isDetailPage || isPast) && <p className={`font-semibold ${isPast ? dateColorClass.replace('slate-800', 'slate-500').replace('sky-600', 'sky-500').replace('rose-600', 'rose-500') : dateColorClass}`}>{date}</p>}
                             <p className={`text-2xl font-bold mt-1 ${isPast ? 'text-slate-500' : 'text-slate-800'}`}>{time}</p>
                         </div>
                         <div className="flex space-x-1">
-                            <button onClick={handleAddToCalendar} title="Googleカレンダーに追加" className="p-2 text-green-600 hover:bg-green-100 rounded-full"><CalendarPlusIcon /></button>
-                            <button onClick={() => onEdit(app)} title="編集" className="p-2 text-slate-500 hover:bg-slate-100 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" /></svg></button>
-                            <button onClick={() => onDelete(app.id)} title="削除" className="p-2 text-rose-500 hover:bg-rose-100 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clipRule="evenodd" /></svg></button>
+                            <button onClick={handleAddToCalendar} title="Googleカレンダーに追加" className="p-2 text-green-600 hover:bg-green-100 rounded-full transition"><CalendarPlusIcon /></button>
+                            <button onClick={() => onEdit(app)} title="編集" className="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" /></svg></button>
+                            <button onClick={() => onDelete(app.id)} title="削除" className="p-2 text-rose-500 hover:bg-rose-100 rounded-full transition"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clipRule="evenodd" /></svg></button>
                         </div>
                     </div>
-                    <div className="mt-4 pt-4 border-t">
+                    <div className="mt-4 pt-4 border-t border-slate-200">
                         <h3 className={`text-lg font-bold ${isPast ? 'text-slate-600' : 'text-slate-800'}`}>{app.customerName} 様</h3>
                         {app.address && <p className="text-slate-600 text-sm mt-1 flex items-center"><LocationIcon />{app.address}</p>}
                         {app.contactPerson && <p className="text-slate-600 text-sm mt-1 flex items-center"><InfoIcon />{app.contactPerson}</p>}
@@ -213,7 +218,7 @@
                     {!isDetailPage && !isPast && (
                         <div className="mt-4 flex justify-between items-center">
                             <span className="text-sm font-medium text-slate-500 flex items-center"><UserIcon />担当: {app.salesPerson}</span>
-                            <button onClick={() => onViewDetails(app.salesPerson)} className="text-sm font-semibold text-sky-600 hover:text-sky-800">詳細を見る →</button>
+                            <button onClick={() => onViewDetails(app.salesPerson)} className="text-sm font-semibold text-sky-600 hover:text-sky-800 transition">詳細を見る →</button>
                         </div>
                     )}
                 </div>
@@ -223,48 +228,44 @@
         const DetailPage = ({ salesPerson, appointments, onBack, onEdit, onDelete, onViewPast }) => {
             const now = new Date();
             const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-            
             const personAppointments = appointments
                 .filter(app => app.salesPerson === salesPerson && app.visitStartTimestamp.toDate() > oneHourAgo)
                 .sort((a, b) => a.visitStartTimestamp.seconds - b.visitStartTimestamp.seconds);
-
             const groupedAppointments = personAppointments.reduce((acc, app) => {
-                const jsDate = app.visitStartTimestamp.toDate();
-                const dateKey = jsDate.toISOString().split('T')[0];
+                const dateKey = app.visitStartTimestamp.toDate().toISOString().split('T')[0];
                 if (!acc[dateKey]) acc[dateKey] = [];
                 acc[dateKey].push(app);
                 return acc;
             }, {});
-
             const sortedDates = Object.keys(groupedAppointments).sort();
-
             return (
                 <div className="container mx-auto p-4 sm:p-6 lg:p-8">
                     <header className="mb-8">
                         <div className="flex justify-between items-center">
-                            <button onClick={onBack} className="flex items-center text-slate-600 hover:text-slate-900 font-semibold mb-4"><BackIcon />一覧に戻る</button>
-                            <button onClick={onViewPast} className="text-sm font-semibold text-sky-600 hover:text-sky-800 mb-4">過去のアポを見る →</button>
+                            <button onClick={onBack} className="flex items-center text-slate-600 hover:text-slate-900 font-semibold transition mb-4"><BackIcon />一覧に戻る</button>
+                            <button onClick={onViewPast} className="text-sm font-semibold text-sky-600 hover:text-sky-800 transition mb-4">過去のアポを見る →</button>
                         </div>
                         <h1 className="text-3xl sm:text-4xl font-bold text-slate-800">{salesPerson}さんのアポイント</h1>
+                        <p className="text-slate-500 mt-2">{personAppointments.length}件の今後の予定があります</p>
                     </header>
                     <main>
-                       {sortedDates.length > 0 ? (
+                        {sortedDates.length > 0 ? (
                             <div className="space-y-8">
                                 {sortedDates.map(date => {
                                     const dateObj = new Date(date + 'T00:00:00');
-                                    const formattedDate = new Intl.DateTimeFormat('ja-JP', { month: 'long', day: 'numeric', weekday: 'long' }).format(dateObj);
+                                    const dateOptions = { month: 'long', day: 'numeric', weekday: 'long' };
+                                    const formattedDate = new Intl.DateTimeFormat('ja-JP', dateOptions).format(dateObj);
+                                    const count = groupedAppointments[date].length;
                                     const dateColorClass = getDateColorClass(dateObj);
                                     return (
                                         <section key={date}>
-                                            <h2 className={`text-xl font-bold mb-4 pb-2 border-b-2 border-sky-200 ${dateColorClass}`}>{formattedDate}</h2>
-                                            <div className="space-y-5">
-                                                {groupedAppointments[date].map(app => <AppointmentCard key={app.id} app={app} onEdit={onEdit} onDelete={onDelete} isDetailPage={true} />)}
-                                            </div>
+                                            <h2 className={`text-xl font-bold mb-4 pb-2 border-b-2 border-sky-200 ${dateColorClass}`}>{formattedDate}<span className="text-base font-medium text-slate-500 ml-3">({count}件)</span></h2>
+                                            <div className="space-y-5">{groupedAppointments[date].map(app => (<AppointmentCard key={app.id} app={app} onEdit={onEdit} onDelete={onDelete} isDetailPage={true} />))}</div>
                                         </section>
                                     );
                                 })}
                             </div>
-                        ) : <div className="text-center py-16 bg-white rounded-xl shadow-sm"><p>今後のアポイントはありません。</p></div>}
+                        ) : (<div className="text-center py-16 bg-white rounded-xl shadow-sm"><p className="text-slate-500">今後のアポイントはありません。</p></div>)}
                     </main>
                 </div>
             );
@@ -273,7 +274,6 @@
         const PastAppointmentsPage = ({ appointments, onBack, onEdit, onDelete, title, filterPerson = null }) => {
             const now = new Date();
             const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-
             const pastAppointments = appointments
                 .filter(app => {
                     const isPast = app.visitStartTimestamp.toDate() <= oneHourAgo;
@@ -281,19 +281,17 @@
                     return isPast && personMatch;
                 })
                 .sort((a, b) => b.visitStartTimestamp.seconds - a.visitStartTimestamp.seconds);
-
             return (
                 <div className="container mx-auto p-4 sm:p-6 lg:p-8">
                     <header className="mb-8">
-                        <button onClick={onBack} className="flex items-center text-slate-600 hover:text-slate-900 font-semibold mb-4"><BackIcon />戻る</button>
+                        <button onClick={onBack} className="flex items-center text-slate-600 hover:text-slate-900 font-semibold transition mb-4"><BackIcon />戻る</button>
                         <h1 className="text-3xl sm:text-4xl font-bold text-slate-800">{title}</h1>
+                        <p className="text-slate-500 mt-2">{pastAppointments.length}件の記録があります</p>
                     </header>
                     <main>
                         {pastAppointments.length > 0 ? (
-                            <div className="space-y-5">
-                                {pastAppointments.map(app => <AppointmentCard key={app.id} app={app} onEdit={onEdit} onDelete={onDelete} isDetailPage={true} isPast={true} />)}
-                            </div>
-                        ) : <div className="text-center py-16 bg-white rounded-xl shadow-sm"><p>過去のアポイントはありません。</p></div>}
+                            <div className="space-y-5">{pastAppointments.map(app => (<AppointmentCard key={app.id} app={app} onEdit={onEdit} onDelete={onDelete} isDetailPage={true} isPast={true} />))}</div>
+                        ) : (<div className="text-center py-16 bg-white rounded-xl shadow-sm"><p className="text-slate-500">過去のアポイントはありません。</p></div>)}
                     </main>
                 </div>
             );
@@ -304,54 +302,47 @@
                 const today = new Date();
                 const dayOfWeek = today.getDay();
                 const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-                return new Date(new Date(today.setDate(diff)).setHours(0, 0, 0, 0));
+                const monday = new Date(today.setDate(diff));
+                monday.setHours(0, 0, 0, 0);
+                return monday;
             });
-
             const salesPersonColors = useRef({});
-            const colorClasses = [
-                'bg-sky-50 text-sky-800 border-sky-300', 'bg-green-50 text-green-800 border-green-300',
-                'bg-amber-50 text-amber-800 border-amber-300', 'bg-rose-100 text-rose-800 border-rose-300',
-                'bg-indigo-50 text-indigo-800 border-indigo-300', 'bg-fuchsia-50 text-fuchsia-800 border-fuchsia-300'
-            ];
-
+            const colorClasses = ['bg-sky-50 text-sky-800 border-sky-300', 'bg-green-50 text-green-800 border-green-300', 'bg-amber-50 text-amber-800 border-amber-300', 'bg-rose-100 text-rose-800 border-rose-300', 'bg-indigo-50 text-indigo-800 border-indigo-300', 'bg-fuchsia-50 text-fuchsia-800 border-fuchsia-300'];
+            let colorIndex = 0;
             const getSalespersonColor = (name) => {
                 if (!salesPersonColors.current[name]) {
-                    const availableColors = colorClasses.filter(c => !Object.values(salesPersonColors.current).includes(c));
-                    salesPersonColors.current[name] = availableColors.length ? availableColors[0] : colorClasses[Object.keys(salesPersonColors.current).length % colorClasses.length];
+                    salesPersonColors.current[name] = colorClasses[colorIndex % colorClasses.length];
+                    colorIndex++;
                 }
                 return salesPersonColors.current[name];
             };
-
-            const handlePrevWeek = () => setCurrentWeekStart(prev => new Date(prev.setDate(prev.getDate() - 7)));
-            const handleNextWeek = () => setCurrentWeekStart(prev => new Date(prev.setDate(prev.getDate() + 7)));
-
+            const handlePrevWeek = () => setCurrentWeekStart(prev => new Date(new Date(prev).setDate(prev.getDate() - 7)));
+            const handleNextWeek = () => setCurrentWeekStart(prev => new Date(new Date(prev).setDate(prev.getDate() + 7)));
             const weekDays = Array.from({ length: 7 }).map((_, i) => new Date(new Date(currentWeekStart).setDate(currentWeekStart.getDate() + i)));
             const weekEnd = new Date(new Date(weekDays[6]).setHours(23, 59, 59, 999));
             const weekAppointments = appointments.filter(app => {
                 const appDate = app.visitStartTimestamp.toDate();
                 return appDate >= currentWeekStart && appDate <= weekEnd;
             });
-            const salesPersonsInWeek = [...new Set(weekAppointments.map(app => app.salesPerson))].sort();
-
+            const salesPersonsInWeek = [...new Set(appointments.map(app => app.salesPerson))].sort();
             return (
                 <div className="container mx-auto p-4 sm:p-6 lg:p-8">
                     <header className="mb-8">
-                        <button onClick={onBack} className="flex items-center text-slate-600 hover:text-slate-900 font-semibold mb-4"><BackIcon />メインに戻る</button>
+                        <button onClick={onBack} className="flex items-center text-slate-600 hover:text-slate-900 font-semibold transition mb-4"><BackIcon />メインに戻る</button>
                         <div className="flex justify-center items-center mb-4">
-                            <button onClick={handlePrevWeek} className="p-2 rounded-full hover:bg-slate-200"><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
-                            <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 mx-4">{`${currentWeekStart.getFullYear()}年 ${currentWeekStart.getMonth() + 1}月`}</h1>
-                            <button onClick={handleNextWeek} className="p-2 rounded-full hover:bg-slate-200"><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>
+                            <button onClick={handlePrevWeek} className="p-2 rounded-full hover:bg-slate-200 transition"><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
+                            <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 mx-4 text-center">{`${currentWeekStart.getFullYear()}年 ${currentWeekStart.getMonth() + 1}月`}</h1>
+                            <button onClick={handleNextWeek} className="p-2 rounded-full hover:bg-slate-200 transition"><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>
                         </div>
                     </header>
                     <main className="overflow-x-auto bg-white p-4 rounded-xl shadow-lg">
                         <table className="w-full border-collapse">
                             <thead>
                                 <tr>
-                                    <th className="p-2 border sticky left-0 bg-white/75 backdrop-blur-sm">担当者</th>
+                                    <th className="p-2 border border-slate-200 w-40 sticky left-0 bg-white/75 backdrop-blur-sm">担当者</th>
                                     {weekDays.map(day => (
-                                        <th key={day.toISOString()} className={`p-2 border ${getDateColorClass(day)}`}>
-                                            {day.toLocaleDateString('ja-JP', { weekday: 'short' })}
-                                            <span className="block text-lg">{day.getDate()}</span>
+                                        <th key={day.toISOString()} className={`p-2 border border-slate-200 ${getDateColorClass(day)}`}>
+                                            {day.toLocaleDateString('ja-JP', { weekday: 'short' })}<span className="block text-lg">{day.getDate()}</span>
                                         </th>
                                     ))}
                                 </tr>
@@ -359,18 +350,19 @@
                             <tbody>
                                 {salesPersonsInWeek.map(person => (
                                     <tr key={person}>
-                                        <td className="p-2 border font-bold align-top sticky left-0 bg-white/75 backdrop-blur-sm">
-                                            <button onClick={() => onViewDetails(person)} className="text-sky-600 hover:underline">{person}</button>
+                                        <td className="p-2 border border-slate-200 font-bold align-top sticky left-0 bg-white/75 backdrop-blur-sm">
+                                            <button onClick={() => onViewDetails(person)} className="text-sky-600 hover:underline w-full text-left">{person}</button>
                                         </td>
                                         {weekDays.map(day => {
                                             const dayAppointments = weekAppointments.filter(app => app.salesPerson === person && app.visitStartTimestamp.toDate().toDateString() === day.toDateString()).sort((a,b) => a.visitStartTimestamp.seconds - b.visitStartTimestamp.seconds);
                                             return (
-                                                <td key={day.toISOString()} className="p-2 border align-top min-w-[160px]">
+                                                <td key={day.toISOString()} className="p-2 border border-slate-200 align-top min-w-[160px]">
                                                     <div className="space-y-2">
                                                         {dayAppointments.map(app => (
                                                             <div key={app.id} className={`p-2 rounded-md border-l-4 ${getSalespersonColor(app.salesPerson)}`}>
                                                                 <p className="font-bold text-xs">{formatVisitTime(app.visitStartTimestamp, app.visitEndTimestamp).time}</p>
                                                                 <p className="font-semibold text-sm truncate">{app.customerName}</p>
+                                                                <p className="text-xs opacity-75 truncate">{app.purpose}</p>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -381,11 +373,13 @@
                                 ))}
                             </tbody>
                         </table>
+                        {salesPersonsInWeek.length === 0 && <div className="text-center p-8 text-slate-500">この週のアポイントはありません。</div>}
                     </main>
                 </div>
             );
         };
 
+        // --- Main App Component (DEFINED LAST) ---
         function App() {
             const [db, setDb] = useState(null);
             const [auth, setAuth] = useState(null);
@@ -420,10 +414,9 @@
             }, []);
             
             useEffect(() => {
-                if (!app) {
-                    const initializedApp = initializeApp(firebaseConfig);
-                    setAuth(getAuth(initializedApp));
-                    setDb(getFirestore(initializedApp));
+                if (app && !db) { // Initialize only if app exists but db doesn't
+                    setDb(getFirestore(app));
+                    setAuth(getAuth(app));
                 }
             }, []);
 
@@ -431,7 +424,7 @@
                 if (!auth) return;
                 const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
                     if (!currentUser) {
-                        try { await signInAnonymously(auth); } catch (error) { console.error(error); }
+                        try { await signInAnonymously(auth); } catch (error) { console.error("Signin failed", error); }
                     }
                     setUser(currentUser);
                     setIsAuthReady(true);
@@ -445,10 +438,11 @@
                 const collectionName = `${teamId}_appointments`;
                 const q = query(collection(db, 'artifacts', appId, 'public', 'data', collectionName), orderBy('visitStartTimestamp', 'asc'));
                 const unsubscribe = onSnapshot(q, (snapshot) => {
-                    setAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-                    setUniqueSalesPeople([...new Set(snapshot.docs.map(doc => doc.data().salesPerson).filter(Boolean))]);
+                    const appointmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setAppointments(appointmentsData);
+                    setUniqueSalesPeople([...new Set(appointmentsData.map(app => app.salesPerson).filter(Boolean))]);
                     setIsLoading(false);
-                });
+                }, (error) => { setIsLoading(false); console.error("Snapshot error", error); });
                 return () => unsubscribe();
             }, [isAuthReady, db, teamId]);
 
@@ -467,7 +461,6 @@
                 localStorage.setItem('sales-app-team-id', id);
                 setTeamId(id);
             };
-
             const handleChangeTeamId = () => {
                 if (window.confirm('チームIDを変更しますか？')) {
                     localStorage.removeItem('sales-app-team-id');
@@ -475,27 +468,40 @@
                     resetForm();
                 }
             };
-
             const proceedWithSubmission = async (appointmentData) => {
-                if (!teamId) return;
+                if (!teamId || !db) return;
                 const collectionName = `${teamId}_appointments`;
                 try {
                     if (editingId) {
                         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, editingId), appointmentData);
                     } else {
-                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', collectionName), appointmentData);
+                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', collectionName), { ...appointmentData, createdAt: serverTimestamp() });
                     }
                     resetForm();
-                } catch (error) { alert('エラーが発生しました。'); }
+                } catch (error) { console.error("Submission error", error); alert('保存中にエラーが発生しました。'); }
             };
-
             const handleSubmit = async (e) => {
                 e.preventDefault();
+                if (!customerName || !visitDate || !visitStartTime || !purpose || !salesPerson) { alert('必須項目を入力してください。'); return; }
                 const newStartTimestamp = new Date(`${visitDate}T${visitStartTime}`);
-                const appointmentData = { customerName, contactPerson, address, visitStartTimestamp: newStartTimestamp, visitEndTimestamp: visitEndTime ? new Date(`${visitDate}T${visitEndTime}`) : null, purpose, salesPerson, createdAt: serverTimestamp() };
-                await proceedWithSubmission(appointmentData);
+                const appointmentData = { customerName, contactPerson, address, visitStartTimestamp: newStartTimestamp, visitEndTimestamp: visitEndTime ? new Date(`${visitDate}T${visitEndTime}`) : null, purpose, salesPerson, authorId: user?.uid, updatedAt: serverTimestamp() };
+                
+                const conflictingAppointment = appointments.find(app => {
+                    if (editingId && app.id === editingId) return false;
+                    if (app.salesPerson !== salesPerson) return false;
+                    const existingStart = app.visitStartTimestamp.toDate();
+                    const existingEnd = app.visitEndTimestamp ? app.visitEndTimestamp.toDate() : existingStart;
+                    return newStartTimestamp < existingEnd && (visitEndTime ? new Date(`${visitDate}T${visitEndTime}`) : newStartTimestamp) > existingStart;
+                });
+
+                if (conflictingAppointment) {
+                    setModalMessage(`警告：${salesPerson}さんには同じ日時に別のアポイントがあります。\nお客様: ${conflictingAppointment.customerName} 様`);
+                    setPendingAppointment(appointmentData);
+                    setIsModalOpen(true);
+                } else {
+                    await proceedWithSubmission(appointmentData);
+                }
             };
-            
             const handleEdit = (appointment) => {
                 const toDateInputFormat = (date) => date.toISOString().split('T')[0];
                 const toTimeInputFormat = (date) => `${('0'+date.getHours()).slice(-2)}:${('0'+date.getMinutes()).slice(-2)}`;
@@ -514,27 +520,15 @@
                     formRef.current?.scrollIntoView({ behavior: 'smooth' });
                 }, 0);
             };
-            
             const handleDelete = async (id) => {
                 if (window.confirm('このアポイントを削除しますか？')) {
                     const collectionName = `${teamId}_appointments`;
-                    try {
-                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, id));
-                    } catch (error) { alert('エラーが発生しました。'); }
+                    try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, id)); } catch (error) { alert('削除中にエラーが発生しました。'); }
                 }
             };
+            const resetForm = () => { setCustomerName(''); setContactPerson(''); setAddress(''); setVisitDate(''); setVisitStartTime(''); setVisitEndTime(''); setPurpose(''); setSalesPerson(''); setEditingId(null); };
+            const handleViewDetails = (person) => { setSelectedSalesPerson(person); setView('detail'); };
             
-            const resetForm = () => {
-                setCustomerName(''); setContactPerson(''); setAddress('');
-                setVisitDate(''); setVisitStartTime(''); setVisitEndTime('');
-                setPurpose(''); setSalesPerson(''); setEditingId(null);
-            };
-            
-            const handleViewDetails = (person) => {
-                setSelectedSalesPerson(person);
-                setView('detail');
-            };
-
             if (!teamId) return <TeamIdEntry onTeamIdSubmit={handleTeamIdSubmit} />;
             
             const mainView = (
@@ -546,18 +540,18 @@
                     </header>
                     <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <div ref={formRef} className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-lg h-fit">
-                            <h2 className="text-2xl font-bold mb-6 border-b pb-4">{editingId ? '編集' : '新規登録'}</h2>
+                            <h2 className="text-2xl font-bold mb-6 border-b pb-4">{editingId ? 'アポイント編集' : '新規アポイント登録'}</h2>
                             <form onSubmit={handleSubmit} className="space-y-5">
-                                 <div><label>お名前 <span className="text-rose-500">*</span></label><input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full p-2 border rounded-lg" required /></div>
-                                 <div><label>住所</label><input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className="w-full p-2 border rounded-lg" /></div>
-                                 <div><label>その他連絡先</label><input type="text" value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} className="w-full p-2 border rounded-lg" /></div>
-                                 <div><label>訪問日 <span className="text-rose-500">*</span></label><input type="date" value={visitDate} onChange={(e) => setVisitDate(e.target.value)} className="w-full p-2 border rounded-lg" required /></div>
+                                 <div><label className="block text-sm font-semibold mb-1">お名前 <span className="text-rose-500">*</span></label><input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full p-2 border rounded-lg" required /></div>
+                                 <div><label className="block text-sm font-semibold mb-1">住所</label><input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className="w-full p-2 border rounded-lg" /></div>
+                                 <div><label className="block text-sm font-semibold mb-1">その他連絡先</label><input type="text" value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} className="w-full p-2 border rounded-lg" /></div>
+                                 <div><label className="block text-sm font-semibold mb-1">訪問日 <span className="text-rose-500">*</span></label><input type="date" value={visitDate} onChange={(e) => setVisitDate(e.target.value)} className="w-full p-2 border rounded-lg" required /></div>
                                  <div className="grid grid-cols-2 gap-4">
-                                    <div><label>開始時間 <span className="text-rose-500">*</span></label><input type="time" value={visitStartTime} onChange={(e) => setVisitStartTime(e.target.value)} className="w-full p-2 border rounded-lg" required /></div>
-                                    <div><label>終了時間</label><input type="time" value={visitEndTime} onChange={(e) => setVisitEndTime(e.target.value)} className="w-full p-2 border rounded-lg" /></div>
+                                    <div><label className="block text-sm font-semibold mb-1">開始時間 <span className="text-rose-500">*</span></label><input type="time" value={visitStartTime} onChange={(e) => setVisitStartTime(e.target.value)} className="w-full p-2 border rounded-lg" required /></div>
+                                    <div><label className="block text-sm font-semibold mb-1">終了時間</label><input type="time" value={visitEndTime} onChange={(e) => setVisitEndTime(e.target.value)} className="w-full p-2 border rounded-lg" /></div>
                                  </div>
-                                 <div><label>営業担当 <span className="text-rose-500">*</span></label><input type="text" value={salesPerson} onChange={(e) => setSalesPerson(e.target.value)} className="w-full p-2 border rounded-lg" required /></div>
-                                 <div><label>目的・商談内容 <span className="text-rose-500">*</span></label><textarea value={purpose} onChange={(e) => setPurpose(e.target.value)} rows="4" className="w-full p-2 border rounded-lg" required></textarea></div>
+                                 <div><label className="block text-sm font-semibold mb-1">営業担当 <span className="text-rose-500">*</span></label><input type="text" value={salesPerson} onChange={(e) => setSalesPerson(e.target.value)} className="w-full p-2 border rounded-lg" required /></div>
+                                 <div><label className="block text-sm font-semibold mb-1">目的・商談内容 <span className="text-rose-500">*</span></label><textarea value={purpose} onChange={(e) => setPurpose(e.target.value)} rows="4" className="w-full p-2 border rounded-lg" required></textarea></div>
                                  <div className="flex space-x-4 pt-2">
                                     <button type="submit" className="w-full bg-sky-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-sky-700">{editingId ? '更新' : '登録'}</button>
                                     {editingId && (<button type="button" onClick={resetForm} className="w-full bg-slate-200 font-bold py-3 px-4 rounded-lg hover:bg-slate-300">キャンセル</button>)}
@@ -574,8 +568,8 @@
                                   </div>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
-                                    <div><label>訪問日</label><input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} className="w-full p-2 border rounded-lg"/></div>
-                                    <div><label>営業担当</label><select value={filterSalesPerson} onChange={e => setFilterSalesPerson(e.target.value)} className="w-full p-2 border rounded-lg bg-white"><option value="">全員</option>{uniqueSalesPeople.map(person => <option key={person} value={person}>{person}</option>)}</select></div>
+                                    <div><label className="block text-sm font-medium mb-1">訪問日</label><input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} className="w-full p-2 border rounded-lg"/></div>
+                                    <div><label className="block text-sm font-medium mb-1">営業担当</label><select value={filterSalesPerson} onChange={e => setFilterSalesPerson(e.target.value)} className="w-full p-2 border rounded-lg bg-white"><option value="">全員</option>{uniqueSalesPeople.map(person => <option key={person} value={person}>{person}</option>)}</select></div>
                                 </div>
                                 <button onClick={() => {setFilterDate(''); setFilterSalesPerson('');}} className="mt-4 text-sm bg-slate-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-slate-600">クリア</button>
                             </div>
@@ -598,9 +592,22 @@
                 </div>
             );
         }
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
+        
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
         root.render(<App />);
+
+    </script>
+    
+    <!-- Service Worker -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('SW Registered'))
+            .catch(err => console.error('SW Registration Failed', err));
+        });
+      }
     </script>
 </body>
 </html>
