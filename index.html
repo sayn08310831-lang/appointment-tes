@@ -34,7 +34,7 @@
     
     <!-- React and Babel -->
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react.dom.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <!-- Japanese Holidays Library -->
     <script src="https://cdn.jsdelivr.net/npm/japanese-holidays@1.0.10/lib/japanese-holidays.min.js"></script>
@@ -58,7 +58,7 @@
             getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp
         } = window.Firebase;
 
-        // --- Firebase Configuration & Initialization ---
+        // --- Firebase Configuration & Initialization (ONCE and ONLY ONCE) ---
         const firebaseConfig = {
             apiKey: "AIzaSyCqT_s4-XtGBkrX590DfYRQWPEdl-kE5-0",
             authDomain: "apointo-a72bc.firebaseapp.com",
@@ -119,14 +119,14 @@
             const [view, setView] = useState('main');
             const [selectedSalesPerson, setSelectedSalesPerson] = useState(null);
             useEffect(() => { const savedTeamId = localStorage.getItem('sales-app-team-id'); if (savedTeamId) setTeamId(savedTeamId); }, []);
-            useEffect(() => { const app = initializeApp(firebaseConfig); setAuth(getAuth(app)); setDb(getFirestore(app)); }, []);
+            useEffect(() => { if (!auth) { const app = initializeApp(firebaseConfig); setAuth(getAuth(app)); setDb(getFirestore(app)); } }, [auth]);
             useEffect(() => { if (!auth) return; const unsubscribe = onAuthStateChanged(auth, async (u) => { if (!u) { try { await signInAnonymously(auth); } catch (e) { console.error(e); } } setUser(auth.currentUser); setIsAuthReady(true); }); return unsubscribe; }, [auth]);
             useEffect(() => { if (!isAuthReady || !db || !teamId) return; setIsLoading(true); const q = query(collection(db, 'artifacts', appId, 'public', 'data', `${teamId}_appointments`), orderBy('visitStartTimestamp', 'asc')); const unsubscribe = onSnapshot(q, (snapshot) => { const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); setAppointments(data); setUniqueSalesPeople([...new Set(data.map(app => app.salesPerson).filter(Boolean))]); setIsLoading(false); }); return unsubscribe; }, [isAuthReady, db, teamId]);
             useEffect(() => { const now = new Date(); const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000); const current = appointments.filter(app => app.visitStartTimestamp?.toDate() > oneHourAgo); const filtered = current.filter(app => (!filterDate || app.visitStartTimestamp?.toDate().toISOString().split('T')[0] === filterDate) && (!filterSalesPerson || app.salesPerson === filterSalesPerson)); setFilteredAppointments(filtered); }, [appointments, filterDate, filterSalesPerson]);
             const handleTeamIdSubmit = (id) => { localStorage.setItem('sales-app-team-id', id); setTeamId(id); };
             const handleChangeTeamId = () => { if (window.confirm('チームIDを変更しますか？')) { localStorage.removeItem('sales-app-team-id'); setTeamId(''); resetForm(); } };
             const proceedWithSubmission = async (appointmentData) => { if (!teamId) return; const collectionName = `${teamId}_appointments`; try { if (editingId) { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, editingId), { ...appointmentData, updatedAt: serverTimestamp() }); } else { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', collectionName), { ...appointmentData, createdAt: serverTimestamp() }); } resetForm(); } catch (error) { console.error(error); alert('保存エラー'); } };
-            const handleSubmit = async (e) => { e.preventDefault(); if (!customerName || !visitDate || !visitStartTime || !purpose || !salesPerson) { alert('必須項目が未入力です'); return; } const newStartTimestamp = new Date(`${visitDate}T${visitStartTime}`); const newEndTimestamp = visitEndTime ? new Date(`${visitDate}T${visitEndTime}`) : newStartTimestamp; const conflicting = appointments.find(app => !(editingId && app.id === editingId) && app.salesPerson === salesPerson && newStartTimestamp < app.visitStartTimestamp.toDate() && newEndTimestamp > app.visitStartTimestamp.toDate()); const appointmentData = { customerName, contactPerson, address, visitStartTimestamp: newStartTimestamp, visitEndTimestamp: newEndTimestamp, purpose, salesPerson, authorId: user?.uid }; if (conflicting) { setPendingAppointment(appointmentData); setModalMessage(`警告: ${salesPerson}さんには同時間帯に別のアポがあります。\n顧客: ${conflicting.customerName}`); setIsModalOpen(true); } else { await proceedWithSubmission(appointmentData); } };
+            const handleSubmit = async (e) => { e.preventDefault(); if (!customerName || !visitDate || !visitStartTime || !purpose || !salesPerson) { alert('必須項目が未入力です'); return; } const newStartTimestamp = new Date(`${visitDate}T${visitStartTime}`); const newEndTimestamp = visitEndTime ? new Date(`${visitDate}T${visitEndTime}`) : newStartTimestamp; const conflicting = appointments.find(app => !(editingId && app.id === editingId) && app.salesPerson === salesPerson && app.visitStartTimestamp?.toDate() && (newStartTimestamp < app.visitStartTimestamp.toDate() && newEndTimestamp > app.visitStartTimestamp.toDate())); const appointmentData = { customerName, contactPerson, address, visitStartTimestamp: newStartTimestamp, visitEndTimestamp: newEndTimestamp, purpose, salesPerson, authorId: user?.uid }; if (conflicting) { setPendingAppointment(appointmentData); setModalMessage(`警告: ${salesPerson}さんには同時間帯に別のアポがあります。\n顧客: ${conflicting.customerName}`); setIsModalOpen(true); } else { await proceedWithSubmission(appointmentData); } };
             const handleConfirmSubmit = async () => { if (pendingAppointment) { await proceedWithSubmission(pendingAppointment); } setIsModalOpen(false); setPendingAppointment(null); };
             const handleCancelSubmit = () => { setIsModalOpen(false); setPendingAppointment(null); };
             const handleEdit = (appointment) => { const toDate = (d) => d.toISOString().split('T')[0]; const toTime = (d) => `${('0'+d.getHours()).slice(-2)}:${('0'+d.getMinutes()).slice(-2)}`; setView('main'); setTimeout(() => { setEditingId(appointment.id); setCustomerName(appointment.customerName); setContactPerson(appointment.contactPerson || ''); setAddress(appointment.address || ''); const start = appointment.visitStartTimestamp.toDate(); setVisitDate(toDate(start)); setVisitStartTime(toTime(start)); setVisitEndTime(appointment.visitEndTimestamp ? toTime(appointment.visitEndTimestamp.toDate()) : ''); setPurpose(appointment.purpose); setSalesPerson(appointment.salesPerson); formRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 0); };
