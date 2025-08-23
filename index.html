@@ -54,7 +54,7 @@
     <script type="text/babel" data-type="module">
         const { useState, useEffect, useRef } = React;
         const { 
-            initializeApp, getAuth, signInAnonymously, onAuthStateChanged,
+            initializeApp, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken,
             getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp
         } = window.Firebase;
 
@@ -119,7 +119,7 @@
             const [view, setView] = useState('main');
             const [selectedSalesPerson, setSelectedSalesPerson] = useState(null);
             useEffect(() => { const savedTeamId = localStorage.getItem('sales-app-team-id'); if (savedTeamId) setTeamId(savedTeamId); }, []);
-            useEffect(() => { if (!auth) { const app = initializeApp(firebaseConfig); setAuth(getAuth(app)); setDb(getFirestore(app)); } }, [auth]);
+            useEffect(() => { if (!auth) { setAuth(getAuth(app)); setDb(getFirestore(app)); } }, [auth]);
             useEffect(() => { if (!auth) return; const unsubscribe = onAuthStateChanged(auth, async (u) => { if (!u) { try { await signInAnonymously(auth); } catch (e) { console.error(e); } } setUser(auth.currentUser); setIsAuthReady(true); }); return unsubscribe; }, [auth]);
             useEffect(() => { if (!isAuthReady || !db || !teamId) return; setIsLoading(true); const q = query(collection(db, 'artifacts', appId, 'public', 'data', `${teamId}_appointments`), orderBy('visitStartTimestamp', 'asc')); const unsubscribe = onSnapshot(q, (snapshot) => { const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); setAppointments(data); setUniqueSalesPeople([...new Set(data.map(app => app.salesPerson).filter(Boolean))]); setIsLoading(false); }); return unsubscribe; }, [isAuthReady, db, teamId]);
             useEffect(() => { const now = new Date(); const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000); const current = appointments.filter(app => app.visitStartTimestamp?.toDate() > oneHourAgo); const filtered = current.filter(app => (!filterDate || app.visitStartTimestamp?.toDate().toISOString().split('T')[0] === filterDate) && (!filterSalesPerson || app.salesPerson === filterSalesPerson)); setFilteredAppointments(filtered); }, [appointments, filterDate, filterSalesPerson]);
