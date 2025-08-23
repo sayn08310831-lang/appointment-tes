@@ -37,12 +37,22 @@
 <body>
     <div id="root"></div>
 
-    <!-- React App Code -->
-    <script type="text/babel" data-type="module">
+    <!-- Firebase SDKs (ESM version) -->
+    <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
+        window.Firebase = {
+            initializeApp,
+            getAuth, signInAnonymously, onAuthStateChanged,
+            getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp
+        };
+    </script>
+
+    <!-- React App Code -->
+    <script type="text/babel">
+        const { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp } = window.Firebase;
         const { useState, useEffect, useRef } = React;
 
         // --- SVG Icons ---
