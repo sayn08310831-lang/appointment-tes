@@ -31,10 +31,47 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/japanese-holidays@1.0.10/lib/japanese-holidays.min.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-</head>
+    
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+      import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+      import { getFirestore, collection, doc, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
+      // Your web app's Firebase configuration
+      const firebaseConfig = {
+        apiKey: "AIzaSyCqT_s4-XtGBkrX590DfYRQWPEdl-kE5-0",
+        authDomain: "apointo-a72bc.firebaseapp.com",
+        projectId: "apointo-a72bc",
+        storageBucket: "apointo-a72bc.appspot.com",
+        messagingSenderId: "1014142886306",
+        appId: "1:1014142886306:web:c97de02bb5f18b8af652fb",
+        measurementId: "G-XWDNVF3W7V"
+      };
+
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+
+      // Reactアプリから使えるように、Firebaseの機能をグローバルに設定
+      window.firebase = {
+          auth,
+          db,
+          signInAnonymously,
+          onAuthStateChanged,
+          collection,
+          doc,
+          query,
+          orderBy,
+          onSnapshot,
+          addDoc,
+          updateDoc,
+          deleteDoc,
+          serverTimestamp,
+          Timestamp
+      };
+    </script>
+    </head>
 <body>
     <div id="root"></div>
 
@@ -62,17 +99,6 @@
       const CalendarPlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zM5 8a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm1 5a1 1 0 100-2 1 1 0 000 2zm3 0a1 1 0 100-2 1 1 0 000 2zm3 0a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /><path d="M13 14a1 1 0 100 2h3a1 1 0 100-2h-3z" /></svg>;
       const InfoIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>;
 
-      // Your web app's Firebase configuration
-      const firebaseConfig = {
-        apiKey: "AIzaSyCqT_s4-XtGBkrX590DfYRQWPEdl-kE5-0",
-        authDomain: "apointo-a72bc.firebaseapp.com",
-        projectId: "apointo-a72bc",
-        storageBucket: "apointo-a72bc.appspot.com",
-        messagingSenderId: "1014142886306",
-        appId: "1:1014142886306:web:c97de02bb5f18b8af652fb",
-        measurementId: "G-XWDNVF3W7V"
-      };
-      
       const appId = 'sales-appointment-app';
 
       // --- Helper Functions ---
@@ -451,11 +477,8 @@
           );
       };
 
-
       // --- Main App Component ---
       function App() {
-          const [db, setDb] = useState(null);
-          const [auth, setAuth] = useState(null);
           const [user, setUser] = useState(null);
           const [isAuthReady, setIsAuthReady] = useState(false);
           const [teamId, setTeamId] = useState('');
@@ -487,17 +510,13 @@
           }, []);
 
           useEffect(() => {
-              firebase.initializeApp(firebaseConfig);
-              const authInstance = firebase.auth();
-              const dbInstance = firebase.firestore();
-              setAuth(authInstance);
-              setDb(dbInstance);
-              const unsubscribeAuth = authInstance.onAuthStateChanged(async (currentUser) => {
+              const { auth, onAuthStateChanged, signInAnonymously } = window.firebase;
+              const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
                   if (currentUser) {
                       setUser(currentUser);
                   } else {
                       try {
-                          await authInstance.signInAnonymously();
+                          await signInAnonymously(auth);
                       } catch (error) { 
                           console.error("Authentication failed:", error); 
                       }
@@ -508,12 +527,16 @@
           }, []);
 
           useEffect(() => {
-              if (!isAuthReady || !db || !teamId) return;
+              if (!isAuthReady || !teamId) return;
+
+              const { db, collection, query, orderBy, onSnapshot } = window.firebase;
               setIsLoading(true);
               const collectionName = `${teamId}_appointments`;
-              const appointmentsCollection = db.collection('artifacts').doc(appId).collection('public').doc('data').collection(collectionName);
-              const q = appointmentsCollection.orderBy('visitStartTimestamp', 'asc');
-              const unsubscribe = q.onSnapshot((snapshot) => {
+              const collectionPath = `artifacts/${appId}/public/data/${collectionName}`;
+              
+              const q = query(collection(db, collectionPath), orderBy('visitStartTimestamp', 'asc'));
+
+              const unsubscribe = onSnapshot(q, (snapshot) => {
                   const appointmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                   setAppointments(appointmentsData);
                   const salesPeople = [...new Set(appointmentsData.map(app => app.salesPerson).filter(Boolean))];
@@ -524,7 +547,7 @@
                   setIsLoading(false);
               });
               return () => unsubscribe();
-          }, [isAuthReady, db, teamId]);
+          }, [isAuthReady, teamId]);
 
           useEffect(() => {
               const now = new Date();
@@ -555,13 +578,14 @@
 
           const proceedWithSubmission = async (appointmentData) => {
               if (!teamId) return;
+              const { db, collection, doc, addDoc, updateDoc } = window.firebase;
               try {
                   const collectionName = `${teamId}_appointments`;
-                  const appointmentsCollection = db.collection('artifacts').doc(appId).collection('public').doc('data').collection(collectionName);
+                  const collectionPath = `artifacts/${appId}/public/data/${collectionName}`;
                   if (editingId) {
-                      await appointmentsCollection.doc(editingId).update(appointmentData);
+                      await updateDoc(doc(db, collectionPath, editingId), appointmentData);
                   } else {
-                      await appointmentsCollection.add(appointmentData);
+                      await addDoc(collection(db, collectionPath), appointmentData);
                   }
                   resetForm();
               } catch (error) { console.error("Error saving appointment: ", error); alert('アポイントの保存中にエラーが発生しました。'); }
@@ -573,16 +597,20 @@
                   alert('必須項目（お名前、訪問日、開始時間、目的、営業担当）を入力してください。');
                   return;
               }
-              const newStartTimestamp = new Date(`${visitDate}T${visitStartTime}`);
-              const newEndTimestamp = visitEndTime ? new Date(`${visitDate}T${visitEndTime}`) : newStartTimestamp;
+              const { Timestamp, serverTimestamp } = window.firebase;
+              const newStartTimestamp = Timestamp.fromDate(new Date(`${visitDate}T${visitStartTime}`));
+              const newEndTimestamp = visitEndTime ? Timestamp.fromDate(new Date(`${visitDate}T${visitEndTime}`)) : newStartTimestamp;
+
               const conflictingAppointment = appointments.find(app => {
                   if (editingId && app.id === editingId) return false;
                   if (app.salesPerson !== salesPerson) return false;
                   const existingStart = app.visitStartTimestamp.toDate();
                   const existingEnd = app.visitEndTimestamp ? app.visitEndTimestamp.toDate() : existingStart;
-                  return newStartTimestamp < existingEnd && newEndTimestamp > existingStart;
+                  return newStartTimestamp.toDate() < existingEnd && newEndTimestamp.toDate() > existingStart;
               });
-              const appointmentData = { customerName, contactPerson, address, visitStartTimestamp: newStartTimestamp, visitEndTimestamp: visitEndTime ? new Date(`${visitDate}T${visitEndTime}`) : null, purpose, salesPerson, authorId: user?.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+
+              const appointmentData = { customerName, contactPerson, address, visitStartTimestamp: newStartTimestamp, visitEndTimestamp: visitEndTime ? newEndTimestamp : null, purpose, salesPerson, authorId: user?.uid, createdAt: serverTimestamp() };
+              
               if (conflictingAppointment) {
                   const { date, time } = formatVisitTime(conflictingAppointment.visitStartTimestamp, conflictingAppointment.visitEndTimestamp);
                   const message = `警告：${salesPerson}さんには、同じ日時に別のアポイントが登録されています。\n\n` + `お客様: ${conflictingAppointment.customerName} 様\n` + `日時: ${date} ${time}`;
@@ -632,10 +660,11 @@
 
           const handleDelete = async (id) => {
               if (window.confirm('このアポイントを削除してもよろしいですか？')) {
+                  const { db, doc, deleteDoc } = window.firebase;
                   try {
                       const collectionName = `${teamId}_appointments`;
-                      const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection(collectionName).doc(id);
-                      await docRef.delete();
+                      const collectionPath = `artifacts/${appId}/public/data/${collectionName}`;
+                      await deleteDoc(doc(db, collectionPath, id));
                   } catch (error) { console.error("Error deleting appointment: ", error); alert('アポイントの削除中にエラーが発生しました。'); }
               }
           };
@@ -720,5 +749,5 @@
       const root = ReactDOM.createRoot(document.getElementById('root'));
       root.render(<App />);
     </script>
-</body>
+    </body>
 </html>
