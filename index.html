@@ -17,11 +17,16 @@
             colors: {
               slate: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a' },
               sky: { 50: '#f0f9ff', 100: '#e0f2fe', 200: '#bae6fd', 300: '#7dd3fc', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1', 800: '#075985' },
-              rose: { 100: '#ffe4e6', 500: '#f43f5e', 600: '#e11d48', 700: '#be123c' },
-              green: { 50: '#f0fdf4', 100: '#dcfce7', 300: '#86efac', 600: '#16a34a', 800: '#166534' },
+              rose: { 50: '#fff1f2', 100: '#ffe4e6', 300: '#fecdd3', 800: '#9f1239' },
+              green: { 50: '#f0fdf4', 100: '#dcfce7', 300: '#86efac', 800: '#166534' },
               amber: { 50: '#fffbeb', 100: '#fef3c7', 300: '#fcd34d', 800: '#92400e' },
               indigo: { 50: '#eef2ff', 100: '#e0e7ff', 300: '#a5b4fc', 800: '#3730a3' },
-              fuchsia: { 50: '#fdf4ff', 100: '#fae8ff', 300: '#f0abfc', 800: '#86198f' }
+              fuchsia: { 50: '#fdf4ff', 100: '#fae8ff', 300: '#f0abfc', 800: '#86198f' },
+              cyan: { 50: '#ecfeff', 100: '#cffafe', 300: '#67e8f9', 800: '#155e75' },
+              emerald: { 50: '#ecfdf5', 100: '#d1fae5', 300: '#6ee7b7', 800: '#065f46' },
+              lime: { 50: '#f7fee7', 100: '#ecfccb', 300: '#bef264', 800: '#4d7c0f' },
+              pink: { 50: '#fdf2f8', 100: '#fce7f3', 300: '#f9a8d4', 800: '#9d174d' },
+              purple: { 50: '#f5f3ff', 100: '#ede9fe', 300: '#c4b5fd', 800: '#5b21b6' }
             }
           }
         }
@@ -42,18 +47,19 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, Timestamp, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, Timestamp, arrayUnion, arrayRemove, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         window.Firebase = {
             initializeApp,
             getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken,
-            getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, Timestamp, arrayUnion, arrayRemove
+            getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, Timestamp, arrayUnion, arrayRemove, setDoc
         };
     </script>
-<script type="text/babel" data-type="module">
+
+    <script type="text/babel" data-type="module">
         const { initializeApp } = window.Firebase;
         const { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } = window.Firebase;
-        const { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, Timestamp, arrayUnion, arrayRemove } = window.Firebase;
+        const { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, Timestamp, arrayUnion, arrayRemove, setDoc } = window.Firebase;
         const { useState, useEffect, useRef, useCallback } = React;
 
         // --- SVG Icons ---
@@ -326,28 +332,21 @@
             const [currentWeekStart, setCurrentWeekStart] = useState(() => {
                 const today = new Date();
                 const dayOfWeek = today.getDay();
-                const diff = today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
-                const monday = new Date(today.setDate(diff));
-                monday.setHours(0, 0, 0, 0);
-                return monday;
+                const diff = today.getDate() - (dayOfWeek - 2 + (dayOfWeek < 2 ? 7 : 0)); // Tuesday as start
+                const tuesday = new Date(today.setDate(diff));
+                tuesday.setHours(0, 0, 0, 0);
+                return tuesday;
             });
 
             const colorClasses = [
-                'bg-sky-50 text-sky-800 border-sky-300', 'bg-green-50 text-green-800 border-green-300',
-                'bg-amber-50 text-amber-800 border-amber-300', 'bg-rose-100 text-rose-800 border-rose-300',
-                'bg-indigo-50 text-indigo-800 border-indigo-300', 'bg-fuchsia-50 text-fuchsia-800 border-fuchsia-300'
+                'bg-sky-50 text-sky-800 border-sky-300',      'bg-emerald-50 text-emerald-800 border-emerald-300',
+                'bg-amber-50 text-amber-800 border-amber-300', 'bg-rose-50 text-rose-800 border-rose-300',
+                'bg-indigo-50 text-indigo-800 border-indigo-300','bg-fuchsia-50 text-fuchsia-800 border-fuchsia-300',
+                'bg-lime-50 text-lime-800 border-lime-300',      'bg-cyan-50 text-cyan-800 border-cyan-300',
+                'bg-pink-50 text-pink-800 border-pink-300',      'bg-purple-50 text-purple-800 border-purple-300'
             ];
+            const assignedColors = useRef(new Map());
             
-            const getSalespersonColor = useCallback((name) => {
-                if (!name) return colorClasses[0];
-                let hash = 0;
-                for (let i = 0; i < name.length; i++) {
-                    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-                }
-                const index = Math.abs(hash % colorClasses.length);
-                return colorClasses[index];
-            }, []);
-
             const handlePrevWeek = () => {
                 setCurrentWeekStart(prev => {
                     const newDate = new Date(prev);
@@ -379,6 +378,17 @@
             });
             
             const salesPersonsInWeek = [...new Set(weekAppointments.map(app => app.salesPerson).filter(Boolean))].sort();
+            
+            useEffect(() => {
+                assignedColors.current = new Map();
+                salesPersonsInWeek.forEach((person, index) => {
+                    assignedColors.current.set(person, colorClasses[index % colorClasses.length]);
+                });
+            }, [salesPersonsInWeek.join(',')]);
+
+            const getSalespersonColor = (name) => {
+                return assignedColors.current.get(name) || colorClasses[0];
+            };
 
             return (
                 <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -600,7 +610,7 @@
                 });
                 return () => unsubscribe();
             }, [isAuthReady, db, teamId]);
-
+            
             const [filteredAppointments, setFilteredAppointments] = useState([]);
             useEffect(() => {
                 const now = new Date();
@@ -632,7 +642,7 @@
             
             const handleHideSalesperson = async (name) => {
                 const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'salespersons');
-                await updateDoc(docRef, { hidden: arrayUnion(name) });
+                await setDoc(docRef, { hidden: arrayUnion(name) }, { merge: true });
             };
 
             const handleShowSalesperson = async (name) => {
@@ -766,7 +776,10 @@
                                 </div>
                                 <div>
                                     <label htmlFor="salesPerson" className="block text-sm font-semibold text-slate-700 mb-1">営業担当 <span className="text-rose-500">*</span></label>
-                                    <input type="text" id="salesPerson" value={salesPerson} onChange={(e) => setSalesPerson(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required />
+                                    <input type="text" list="salespersons-list" id="salesPerson" value={salesPerson} onChange={(e) => setSalesPerson(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required />
+                                    <datalist id="salespersons-list">
+                                        {visibleSalespersons.map(person => <option key={person} value={person} />)}
+                                    </datalist>
                                 </div>
                                 <div><label htmlFor="purpose" className="block text-sm font-semibold text-slate-700 mb-1">目的・商談内容 <span className="text-rose-500">*</span></label><textarea id="purpose" value={purpose} onChange={(e) => setPurpose(e.target.value)} rows="4" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required></textarea></div>
                                 <div className="flex items-center space-x-4 pt-2">
@@ -808,13 +821,13 @@
             const renderView = () => {
                 switch (currentView.view) {
                     case 'detail':
-                        return <DetailPage salesPerson={currentView.data} appointments={appointments.filter(app => !hiddenSalespersons.includes(app.salesPerson))} onBack={handleBack} onEdit={handleEdit} onDelete={handleDelete} onViewPast={() => navigateTo('past_personal', currentView.data)} />;
+                        return <DetailPage salesPerson={currentView.data} appointments={appointments} onBack={handleBack} onEdit={handleEdit} onDelete={handleDelete} onViewPast={() => navigateTo('past_personal', currentView.data)} />;
                     case 'past_all':
-                        return <PastAppointmentsPage appointments={appointments.filter(app => !hiddenSalespersons.includes(app.salesPerson))} onBack={handleBack} onEdit={handleEdit} onDelete={handleDelete} title="チームの過去アポイント" />;
+                        return <PastAppointmentsPage appointments={appointments} onBack={handleBack} onEdit={handleEdit} onDelete={handleDelete} title="チームの過去アポイント" />;
                     case 'past_personal':
-                        return <PastAppointmentsPage appointments={appointments.filter(app => !hiddenSalespersons.includes(app.salesPerson))} onBack={handleBack} onEdit={handleEdit} onDelete={handleDelete} title={`${currentView.data}さんの過去アポイント`} filterPerson={currentView.data} />;
+                        return <PastAppointmentsPage appointments={appointments} onBack={handleBack} onEdit={handleEdit} onDelete={handleDelete} title={`${currentView.data}さんの過去アポイント`} filterPerson={currentView.data} />;
                     case 'weekly':
-                        return <WeeklyPage appointments={appointments.filter(app => !hiddenSalespersons.includes(app.salesPerson))} onBack={handleBack} onViewDetails={(person) => navigateTo('detail', person)} />;
+                        return <WeeklyPage appointments={appointments} onBack={handleBack} onViewDetails={(person) => navigateTo('detail', person)} />;
                     default:
                         return mainView;
                 }
