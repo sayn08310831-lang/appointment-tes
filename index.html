@@ -521,7 +521,6 @@
 
             const navigateTo = useCallback((view, data = null) => {
                 const newState = { view, data };
-                // Don't push state if it's the same as the current one to avoid multiple back clicks for nothing
                 if (currentView.view !== newState.view || currentView.data !== newState.data) {
                     window.history.pushState(newState, '');
                     setCurrentView(newState);
@@ -534,9 +533,9 @@
 
             useEffect(() => {
                 const handlePopState = (event) => {
-                    // When history is empty (initial load), state can be null
                     setCurrentView(event.state || { view: 'main', data: null });
                 };
+                window.history.replaceState({ view: 'main', data: null }, '');
                 window.addEventListener('popstate', handlePopState);
                 return () => window.removeEventListener('popstate', handlePopState);
             }, []);
@@ -701,10 +700,7 @@
                 };
                 const toTimeInputFormat = (date) => `${('0'+date.getHours()).slice(-2)}:${('0'+date.getMinutes()).slice(-2)}`;
                 
-                // 戻るボタンの履歴をリセットしてメインに戻す
-                window.history.replaceState({ view: 'main', data: null }, ''); // replace current state
-                window.history.pushState({ view: 'main', data: null }, ''); // push a new main state to clear forward history
-                window.history.back(); // go back to the replaced state
+                setCurrentView({ view: 'main', data: null });
                 
                 setTimeout(() => {
                     setEditingId(appointment.id);
