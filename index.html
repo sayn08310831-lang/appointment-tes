@@ -47,19 +47,18 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, Timestamp, writeBatch, where, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, Timestamp, writeBatch, where, getDoc, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         window.Firebase = {
             initializeApp,
             getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken,
-            getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, Timestamp, writeBatch, where, getDoc, getDocs
+            getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, Timestamp, writeBatch, where, getDoc, getDocs, setDoc
         };
     </script>
-
-    <script type="text/babel" data-type="module">
+<script type="text/babel" data-type="module">
         const { initializeApp } = window.Firebase;
         const { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } = window.Firebase;
-        const { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, Timestamp, writeBatch, where, getDoc, getDocs } = window.Firebase;
+        const { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, Timestamp, writeBatch, where, getDoc, getDocs, setDoc } = window.Firebase;
         const { useState, useEffect, useRef, useCallback } = React;
 
         // --- SVG Icons ---
@@ -325,8 +324,7 @@
                 </div>
             );
         };
-
-        const WeeklyPage = ({ appointments, onBack, onViewDetails }) => {
+const WeeklyPage = ({ appointments, onBack, onViewDetails, colorMap }) => {
             const [currentWeekStart, setCurrentWeekStart] = useState(() => {
                 const today = new Date();
                 const dayOfWeek = today.getDay();
@@ -335,29 +333,6 @@
                 tuesday.setHours(0, 0, 0, 0);
                 return tuesday;
             });
-
-            const colorClasses = [
-                'bg-sky-50 text-sky-800 border-sky-400',      'bg-emerald-50 text-emerald-800 border-emerald-400',
-                'bg-amber-50 text-amber-800 border-amber-400', 'bg-rose-50 text-rose-800 border-rose-400',
-                'bg-indigo-50 text-indigo-800 border-indigo-400','bg-fuchsia-50 text-fuchsia-800 border-fuchsia-400',
-                'bg-lime-50 text-lime-800 border-lime-400',      'bg-cyan-50 text-cyan-800 border-cyan-400',
-                'bg-pink-50 text-pink-800 border-pink-400',      'bg-purple-50 text-purple-800 border-purple-400',
-                'bg-green-50 text-green-800 border-green-400',   'bg-yellow-50 text-yellow-800 border-yellow-400',
-                'bg-red-50 text-red-800 border-red-400', 'bg-blue-50 text-blue-800 border-blue-400',
-                'bg-orange-50 text-orange-800 border-orange-400', 'bg-teal-50 text-teal-800 border-teal-400',
-                'bg-violet-50 text-violet-800 border-violet-400', 'bg-gray-200 text-gray-800 border-gray-400'
-            ];
-            
-            const getSalespersonColor = useCallback((name) => {
-                if (!name) return colorClasses[0];
-                let hash = 0;
-                for (let i = 0; i < name.length; i++) {
-                    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-                    hash = hash & hash; 
-                }
-                const index = Math.abs(hash % colorClasses.length);
-                return colorClasses[index];
-            }, []);
 
             const handlePrevWeek = () => {
                 setCurrentWeekStart(prev => {
@@ -441,7 +416,7 @@
                                                     <td key={day.toISOString()} className="p-1 border border-slate-200 align-top">
                                                         <div className="space-y-1">
                                                             {dayAppointments.map(app => (
-                                                                <div key={app.id} className={`p-1 rounded border-l-4 ${getSalespersonColor(app.salesPerson)}`}>
+                                                                <div key={app.id} className={`p-1 rounded border-l-4 ${colorMap[app.salesPerson] || 'bg-gray-200'}`}>
                                                                     <p className="font-bold text-[10px]">{formatVisitTime(app.visitStartTimestamp, app.visitEndTimestamp).time}</p>
                                                                     <p className="font-semibold text-[11px] truncate">{app.customerName}</p>
                                                                     <p className="text-[10px] opacity-75 truncate">{app.purpose}</p>
@@ -557,6 +532,19 @@
             const [currentView, setCurrentView] = useState({ view: 'main', data: null });
             const [managingSalespersons, setManagingSalespersons] = useState(false);
             const [allSalespersons, setAllSalespersons] = useState([]);
+            const [colorMap, setColorMap] = useState({});
+
+            const colorClasses = [
+                'bg-sky-50 text-sky-800 border-sky-400',      'bg-emerald-50 text-emerald-800 border-emerald-400',
+                'bg-amber-50 text-amber-800 border-amber-400', 'bg-rose-50 text-rose-800 border-rose-400',
+                'bg-indigo-50 text-indigo-800 border-indigo-400','bg-fuchsia-50 text-fuchsia-800 border-fuchsia-400',
+                'bg-lime-50 text-lime-800 border-lime-400',      'bg-cyan-50 text-cyan-800 border-cyan-400',
+                'bg-pink-50 text-pink-800 border-pink-400',      'bg-purple-50 text-purple-800 border-purple-400',
+                'bg-green-50 text-green-800 border-green-400',   'bg-yellow-50 text-yellow-800 border-yellow-400',
+                'bg-red-50 text-red-800 border-red-400', 'bg-blue-50 text-blue-800 border-blue-400',
+                'bg-orange-50 text-orange-800 border-orange-400', 'bg-teal-50 text-teal-800 border-teal-400',
+                'bg-violet-50 text-violet-800 border-violet-400', 'bg-gray-200 text-gray-800 border-gray-400'
+            ];
 
             const navigateTo = useCallback((view, data = null) => {
                 const newState = { view, data };
@@ -565,10 +553,6 @@
                     setCurrentView(newState);
                 }
             }, [currentView]);
-
-            const handleBack = useCallback(() => {
-                window.history.back();
-            }, []);
 
             useEffect(() => {
                 const handlePopState = (event) => {
@@ -607,6 +591,19 @@
 
             useEffect(() => {
                 if (!isAuthReady || !db || !teamId) return;
+                const colorMapRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'color_map');
+                const unsubscribe = onSnapshot(colorMapRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        setColorMap(docSnap.data() || {});
+                    } else {
+                        setColorMap({});
+                    }
+                });
+                return () => unsubscribe();
+            }, [isAuthReady, db, teamId]);
+
+            useEffect(() => {
+                if (!isAuthReady || !db || !teamId) return;
                 setIsLoading(true);
                 const collectionName = `${teamId}_appointments`;
                 const appointmentsCollection = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
@@ -623,6 +620,28 @@
                 });
                 return () => unsubscribe();
             }, [isAuthReady, db, teamId]);
+
+            useEffect(() => {
+                if (!db || allSalespersons.length === 0) return;
+
+                const newPersons = allSalespersons.filter(p => !colorMap[p]);
+                if (newPersons.length > 0) {
+                    const newColorMapUpdates = {};
+                    const usedColors = Object.values(colorMap);
+                    let availableColors = colorClasses.filter(c => !usedColors.includes(c));
+                    
+                    newPersons.forEach(person => {
+                        if (availableColors.length > 0) {
+                            newColorMapUpdates[person] = availableColors.shift();
+                        } else {
+                            newColorMapUpdates[person] = colorClasses[Math.floor(Math.random() * colorClasses.length)];
+                        }
+                    });
+
+                    const colorMapRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'color_map');
+                    setDoc(colorMapRef, newColorMapUpdates, { merge: true });
+                }
+            }, [allSalespersons, colorMap, db]);
 
             const [filteredAppointments, setFilteredAppointments] = useState([]);
             useEffect(() => {
@@ -651,7 +670,7 @@
                     resetForm();
                 }
             };
-
+            
             const proceedWithSubmission = async (appointmentData) => {
                 if (!teamId) return;
                 try {
@@ -827,6 +846,7 @@
             return (
                 <div className="bg-slate-50 min-h-screen font-sans text-slate-800">
                     <ConfirmationModal isOpen={isModalOpen} message={modalMessage} onConfirm={handleConfirmSubmit} onCancel={handleCancelSubmit} />
+                    
                     {(() => {
                         switch (currentView.view) {
                             case 'detail':
@@ -836,7 +856,7 @@
                             case 'past_personal':
                                 return <PastAppointmentsPage appointments={appointments} onBack={handleBack} onEdit={handleEdit} onDelete={handleDelete} title={`${currentView.data}さんの過去アポイント`} filterPerson={currentView.data} />;
                             case 'weekly':
-                                return <WeeklyPage appointments={appointments} onBack={handleBack} onViewDetails={(person) => navigateTo('detail', person)} />;
+                                return <WeeklyPage appointments={appointments} colorMap={colorMap} onBack={handleBack} onViewDetails={(person) => navigateTo('detail', person)} />;
                             case 'settings':
                                 return <SalespersonManager db={db} teamId={teamId} allSalespersons={allSalespersons} onClose={handleBack} />;
                             default:
@@ -846,4 +866,5 @@
                 </div>
             );
         }
+
     </script>
