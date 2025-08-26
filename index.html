@@ -47,10 +47,7 @@
 <body>
     <div id="root"></div>
 
-    <!-- 
-        【修正】FirebaseのインポートとReactアプリケーションロジックを統合
-        これにより、実行タイミングとスコープの問題を解消
-    -->
+    <!-- アプリケーションロジック -->
     <script type="text/babel" data-type="module">
         // Firebase SDKのインポート (バージョン11.6.1を使用)
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -64,6 +61,7 @@
         const UserIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>;
         const LocationIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>;
         const BackIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" /></svg>;
+        // CalendarPlusIconの定義（元のリクエストに含まれていた定義を採用）
         const CalendarPlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zM5 8a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm1 5a1 1 0 100-2 1 1 0 000 2zm3 0a1 1 0 100-2 1 1 0 000 2zm3 0a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /><path d="M13 14a1 1 0 100 2h3a1 1 0 100-2h-3z" /></svg>;
         const InfoIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>;
         const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clipRule="evenodd" /></svg>;
@@ -346,7 +344,7 @@
             );
         };
 
-        // 【修正点】WeeklyPageがcolorMapを受け取る
+        // WeeklyPageがcolorMapを受け取る
         const WeeklyPage = ({ appointments, colorMap, onBack, onViewDetails }) => {
             const [currentWeekStart, setCurrentWeekStart] = useState(() => {
                 const today = new Date();
@@ -362,7 +360,7 @@
             // デフォルトカラー
             const DEFAULT_COLOR = 'bg-gray-200 text-gray-800 border-gray-400';
 
-            // 【修正点】colorMapを使用して担当者の色を決定する関数（ハッシュ計算ロジックは削除）
+            // colorMapを使用して担当者の色を決定する関数
             const getSalespersonColor = useCallback((name) => {
                 if (!name) return DEFAULT_COLOR;
                 // colorMapから色を取得。なければデフォルトカラーを使用。
@@ -477,7 +475,6 @@
             const [isDeleting, setIsDeleting] = useState(false);
             
             const handleDelete = async (nameToDelete) => {
-                // ... (省略: このコンポーネントのロジックは変更なし) ...
                 const confirmation = window.confirm(`本当に「${nameToDelete}」さんを完全削除しますか？\n\nこの担当者が設定されている過去の全てのアポイントから名前が削除されます。\nこの操作は元に戻せません。`);
                 if (!confirmation) return;
 
@@ -598,6 +595,7 @@
 
             const navigateTo = useCallback((view, data = null) => {
                 const newState = { view, data };
+                // currentViewがnullでないことを確認してから比較する
                 if (!currentView || currentView.view !== newState.view || currentView.data !== newState.data) {
                     window.history.pushState(newState, '');
                     setCurrentView(newState);
@@ -609,6 +607,7 @@
                 const handlePopState = (event) => {
                     setCurrentView(event.state || { view: 'main', data: null });
                 };
+                // 初期状態の設定を確認
                 if (!window.history.state) {
                     window.history.replaceState({ view: 'main', data: null }, '');
                 }
@@ -648,7 +647,7 @@
             // Firestoreからカラーマップを読み込む（チームIDごとに管理）
             useEffect(() => {
                 if (!isAuthReady || !db || !teamId) return;
-                // 【改善】チームIDごとにカラーマップを管理
+                // チームIDごとにカラーマップを管理
                 const colorMapRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', `${teamId}_color_map`);
                 const unsubscribe = onSnapshot(colorMapRef, (docSnap) => {
                     if (docSnap.exists()) {
@@ -675,6 +674,10 @@
                     setIsLoading(false);
                 }, (error) => {
                     console.error("Error fetching appointments:", error);
+                    // パーミッションエラーの可能性をユーザーに通知
+                    if (error.code === 'permission-denied') {
+                        alert('データの読み込み権限がありません。Firebaseのセキュリティルールを確認してください。');
+                    }
                     setIsLoading(false);
                 });
                 return () => unsubscribe();
@@ -708,6 +711,7 @@
             // フィルタリング処理
             const filteredAppointments = useMemo(() => {
                 const now = new Date();
+                // 1時間前以降の予定を表示するロジックを維持
                 const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
 
                 return appointments.filter(app => {
@@ -752,7 +756,10 @@
                         await addDoc(appointmentsCollection, appointmentData);
                     }
                     resetForm();
-                } catch (error) { console.error("Error saving appointment: ", error); alert('アポイントの保存中にエラーが発生しました。'); }
+                } catch (error) { 
+                    console.error("Error saving appointment: ", error); 
+                    alert('アポイントの保存中にエラーが発生しました。Firebaseの権限を確認してください。'); 
+                }
             };
 
             const handleSubmit = async (e) => {
@@ -858,7 +865,10 @@
                         const collectionName = `${teamId}_appointments`;
                         const docRef = doc(db, 'artifacts', appId, 'public', 'data', collectionName, id);
                         await deleteDoc(docRef);
-                    } catch (error) { console.error("Error deleting appointment: ", error); alert('アポイントの削除中にエラーが発生しました。'); }
+                    } catch (error) { 
+                        console.error("Error deleting appointment: ", error); 
+                        alert('アポイントの削除中にエラーが発生しました。Firebaseの権限を確認してください。'); 
+                    }
                 }
             };
 
@@ -951,6 +961,9 @@
                     <ConfirmationModal isOpen={isModalOpen} message={modalMessage} onConfirm={handleConfirmSubmit} onCancel={handleCancelSubmit} />
 
                     {(() => {
+                        // currentViewがnullでないことを確認
+                        if (!currentView) return mainView;
+
                         switch (currentView.view) {
                             case 'detail':
                                 return <DetailPage salesPerson={currentView.data} appointments={appointments} onBack={handleBack} onEdit={handleEdit} onDelete={handleDelete} onViewPast={() => navigateTo('past_personal', currentView.data)} />;
@@ -983,4 +996,3 @@
     </script>
 </body>
 </html>
-```
