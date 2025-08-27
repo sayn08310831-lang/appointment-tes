@@ -36,25 +36,34 @@
     <style>
         body { font-family: 'Noto Sans JP', sans-serif; }
     </style>
-    <!-- 依存ライブラリの読み込み -->
+    <!-- 依存ライブラリの読み込み (診断ログを追加) -->
+    <script>console.log("[診断ログ1] 依存ライブラリ(React/Babel) 読み込み開始");</script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/japanese-holidays@1.0.10/lib/japanese-holidays.min.js"></script>
+    <script>console.log("[診断ログ2] 依存ライブラリ(React/Babel) 読み込み完了");</script>
 </head>
 <body>
-    <div id="root"></div>
+    <div id="root">
+        <!-- 初期ローディング表示（スクリプトが正常に動作すれば上書きされます） -->
+        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; color: #94a3b8;">
+            読み込み中...
+        </div>
+    </div>
 
     <!-- 
-        【修正】ステップ1: Firebase SDKの読み込みと準備
-        このブロックは非同期で実行されます。完了すると window.Firebase に機能が格納され、
-        'FirebaseReady' イベントが発火します。
+        ステップ1: Firebase SDKの読み込みと準備 (Moduleとして実行)
     -->
     <script type="module">
-        // Firebase SDKのインポート（バージョンは元の指定通り11.6.1を使用）
+        console.log("[診断ログ3] Firebase SDK (Module) 読み込み開始");
+        
+        // 【修正Ver.4】互換性のため、Ver.3で導入したトップレベルawaitとtry/catchを削除し、安定した個別のimport文に戻す
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, Timestamp, writeBatch, where, getDoc, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        console.log("[診断ログ4] Firebase SDK インポート定義完了");
 
         // Reactアプリからアクセスできるようにグローバルスコープ(window)に公開
         window.Firebase = {
@@ -66,24 +75,29 @@
         // 準備完了を示すフラグを設定
         window.isFirebaseReady = true;
 
-        // 準備完了イベントを発火（Reactアプリが待機している場合に通知）
-        console.log("Firebase SDK Ready.");
+        // 準備完了イベントを発火
+        console.log("[診断ログ5] Firebase準備完了。アプリ起動イベント(FirebaseReady)を発火します。");
         window.dispatchEvent(new CustomEvent('FirebaseReady'));
     </script>
 
     <!-- 
-        【修正】ステップ2: Reactアプリケーション本体 (Babelで実行)
-        Firebaseの準備完了を待ってからアプリを起動する仕組みを導入。
+        ステップ2: Reactアプリケーション本体 (Babelで実行)
+        Firebaseの準備完了を待ってからアプリを起動する。
     -->
     <script type="text/babel">
+        console.log("[診断ログ6] Reactアプリスクリプト(Babel) 実行開始");
+
         // アプリケーションの起動処理を関数でラップ
         function startApplication() {
-            console.log("Starting Application...");
+            console.log("[診断ログ7] アプリケーション起動処理(startApplication)を開始します。");
 
-            // Firebase SDKが利用可能か最終チェック
-            if (!window.Firebase) {
-                console.error("Fatal Error: Firebase SDK failed to load.");
-                document.getElementById('root').innerHTML = '<div style="padding: 20px; color: red;">エラー：アプリケーションの起動に失敗しました。(Firebase SDKロード失敗)</div>';
+            // 必須ライブラリが利用可能か最終チェック
+            if (!window.Firebase || !window.React || !window.ReactDOM || !window.Firebase.initializeApp) {
+                console.error("[診断ログ エラーB] 必須ライブラリがロードされていません。", {Firebase: !!window.Firebase, React: !!window.React, ReactDOM: !!window.ReactDOM, FirebaseInit: window.Firebase ? !!window.Firebase.initializeApp : false});
+                const root = document.getElementById('root');
+                if (root) {
+                     root.innerHTML = '<div style="padding: 20px; color: red;">エラー：アプリケーションの起動に失敗しました。(必須ライブラリのロード失敗)</div>';
+                }
                 return;
             }
 
@@ -203,7 +217,7 @@
             };
 
             // --- コンポーネント定義 ---
-
+            
             const ConfirmationModal = ({ isOpen, message, onConfirm, onCancel }) => {
                 if (!isOpen) return null;
                 return (
@@ -686,8 +700,9 @@
                     if (savedTeamId) setTeamId(savedTeamId);
                 }, []);
 
-                // Firebase初期化と認証
+                // Firebase初期化と認証 (診断ログを追加)
                 useEffect(() => {
+                    console.log("[診断ログ8] Firebase初期化・認証開始");
                     try {
                         const app = initializeApp(firebaseConfig);
                         const authInstance = getAuth(app);
@@ -698,17 +713,19 @@
                                 try {
                                     // 匿名認証
                                     await signInAnonymously(authInstance);
+                                    console.log("[診断ログ9] 匿名認証成功");
                                 } catch (error) {
-                                    console.error("Authentication failed:", error);
+                                    console.error("[診断ログ エラーC] 認証失敗:", error);
                                     setError("認証に失敗しました。Firebaseで匿名認証が有効か確認してください。");
                                 }
                             }
                             setUser(authInstance.currentUser);
                             setIsAuthReady(true);
+                            console.log("[診断ログ10] 認証準備完了 (AuthReady)");
                         });
                         return () => unsubscribeAuth();
                     } catch (error) {
-                        console.error("Firebase initialization failed:", error);
+                        console.error("[診断ログ エラーD] Firebase初期化失敗:", error);
                         setError("アプリの初期化に失敗しました。Firebaseの設定(APIキーなど)が正しいか確認してください。");
                     }
                 }, []);
@@ -731,9 +748,10 @@
                     return () => unsubscribe();
                 }, [isAuthReady, db, teamId]);
 
-                // アポイントメントデータの読み込み
+                // アポイントメントデータの読み込み (診断ログを追加)
                 useEffect(() => {
                     if (!isAuthReady || !db || !teamId) return;
+                    console.log("[診断ログ11] アポイントデータ読み込み開始 (TeamID: " + teamId + ")");
                     setIsLoading(true);
                     setError(null); // 読み込み開始時にエラーをリセット
 
@@ -748,8 +766,9 @@
                         const salesPeople = [...new Set(appointmentsData.map(app => app.salesPerson).filter(Boolean))].sort();
                         setAllSalespersons(salesPeople);
                         setIsLoading(false);
+                        console.log("[診断ログ12] アポイントデータ読み込み完了 (" + appointmentsData.length + "件)");
                     }, (error) => {
-                        console.error("Error fetching appointments:", error);
+                        console.error("[診断ログ エラーE] データ読み込み失敗:", error);
                         setError(`データの読み込みに失敗しました。(Team ID: ${teamId})\nFirestoreのセキュリティルールが正しく設定されているか確認してください。\n詳細: ${error.message}`);
                         setIsLoading(false);
                     });
@@ -1126,6 +1145,7 @@
             }
 
             // Reactアプリケーションのレンダリング実行
+            console.log("[診断ログ13] Reactレンダリング実行");
             const rootElement = document.getElementById('root');
             if (rootElement) {
                 const root = ReactDOM.createRoot(rootElement);
@@ -1136,25 +1156,27 @@
                     </React.StrictMode>
                 );
             } else {
-                console.error("Root element not found");
+                console.error("[診断ログ エラーF] Root element not found");
             }
+            console.log("[診断ログ14] アプリケーション起動処理 完了");
         } // end of startApplication
 
-        // 【修正】実行制御ロジック
+        // 実行制御ロジック
         // Firebaseの準備完了を待ってアプリケーションを起動する
         if (window.isFirebaseReady) {
             // すでに準備完了している場合（Firebaseスクリプトが先に実行された）
+            console.log("[診断ログ6.1] Firebaseは準備完了済み。直ちにアプリを起動します。");
             startApplication();
         } else {
             // まだ準備が完了していない場合（Reactスクリプトが先に実行された）
-            console.log("Waiting for Firebase SDK...");
+            console.log("[診断ログ6.2] Firebase待機中。イベントリスナーを登録します。");
             // ローディング表示を設定
             const rootElement = document.getElementById('root');
-            if (rootElement && !rootElement.hasChildNodes()) {
-                 // Tailwind CSSのクラスを使ってローディング表示
-                 rootElement.innerHTML = '<div class="flex justify-center items-center h-screen text-slate-500">アプリを準備中...</div>';
+            if (rootElement) {
+                 // Tailwind CSSのクラスはまだ使えない可能性があるため、インラインスタイルで表示
+                 rootElement.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; color: #94a3b8;">アプリを準備中...</div>';
             }
-            // イベントリスナーを登録して待機する
+            // イベントリスナーを登録して待機する ({ once: true } で一度だけ実行)
             window.addEventListener('FirebaseReady', startApplication, { once: true });
         }
 
