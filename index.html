@@ -36,6 +36,7 @@
     <style>
         body { font-family: 'Noto Sans JP', sans-serif; }
     </style>
+    <!-- 依存ライブラリの読み込み -->
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -45,1064 +46,1118 @@
     <div id="root"></div>
 
     <!-- 
-        【修正点】
-        Firebase SDKのインポートとReactアプリケーションの処理を一つのブロックに統合。
-        これにより、実行順序の問題（レースコンディション）による起動エラーを解消。
+        【修正】ステップ1: Firebase SDKの読み込みと準備
+        このブロックは非同期で実行されます。完了すると window.Firebase に機能が格納され、
+        'FirebaseReady' イベントが発火します。
     -->
-    <script type="text/babel" data-type="module">
+    <script type="module">
         // Firebase SDKのインポート（バージョンは元の指定通り11.6.1を使用）
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, Timestamp, writeBatch, where, getDoc, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const { useState, useEffect, useRef, useCallback, useMemo } = React;
-
-        // --- SVG Icons ---
-        const UserIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>;
-        const LocationIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>;
-        const BackIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" /></svg>;
-        const CalendarPlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm1 8a1 1 0 100-2h4a1 1 0 100 2H7z" clipRule="evenodd" /><path d="M13 14h-2v-2a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2z" /></svg>;
-        const InfoIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>;
-        const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clipRule="evenodd" /></svg>;
-        const CogIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.982.502 2.222-.098 3.142-.58.9-1.589 1.555-1.589 2.622s1.01 1.722 1.589 2.622c.6.92.638 2.16.098 3.142-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.286.948c.38 1.56 2.6 1.56 2.98 0a1.532 1.532 0 012.286-.948c1.372.836 2.942-.734 2.106-2.106a1.532 1.532 0 01-.098-3.142c.58-.9 1.589-1.555 1.589-2.622s-1.01-1.722-1.589-2.622a1.532 1.532 0 01.098-3.142c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.286-.948zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>;
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyCqT_s4-XtGBkrX590DfYRQWPEdl-kE5-0",
-            authDomain: "apointo-a72bc.firebaseapp.com",
-            projectId: "apointo-a72bc",
-            storageBucket: "apointo-a72bc.appspot.com",
-            messagingSenderId: "1014142886306",
-            appId: "1:1014142886306:web:c97de02bb5f18b8af652fb",
-            measurementId: "G-XWDNVF3W7V"
-        };
-        const appId = 'default-app-id';
-
-        // --- ユーティリティ関数 ---
-
-        // 【改善】Timestampを安全にDateオブジェクトに変換する関数
-        const timestampToDate = (timestamp) => {
-            if (timestamp && typeof timestamp.toDate === 'function') {
-                try {
-                    return timestamp.toDate();
-                } catch (e) {
-                    console.error("Error calling toDate():", e, timestamp);
-                    return null;
-                }
-            }
-            // オブジェクト形式（{seconds: ..., nanoseconds: ...}）の場合も考慮
-            if (timestamp && typeof timestamp.seconds === 'number') {
-                return new Date(timestamp.seconds * 1000);
-            }
-            return null;
+        // Reactアプリからアクセスできるようにグローバルスコープ(window)に公開
+        window.Firebase = {
+            initializeApp,
+            getAuth, signInAnonymously, onAuthStateChanged,
+            getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, Timestamp, writeBatch, where, getDoc, getDocs, setDoc
         };
 
-        const formatVisitTime = (startTimestamp, endTimestamp) => {
-            const startDate = timestampToDate(startTimestamp);
-            if (!startDate) return { date: '日時未設定', time: '' };
+        // 準備完了を示すフラグを設定
+        window.isFirebaseReady = true;
 
-            const dateOptions = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' };
-            const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
-            const dateStr = new Intl.DateTimeFormat('ja-JP', dateOptions).format(startDate);
-            const startTimeStr = new Intl.DateTimeFormat('ja-JP', timeOptions).format(startDate);
+        // 準備完了イベントを発火（Reactアプリが待機している場合に通知）
+        console.log("Firebase SDK Ready.");
+        window.dispatchEvent(new CustomEvent('FirebaseReady'));
+    </script>
 
-            const endDate = timestampToDate(endTimestamp);
-            if (endDate) {
-                const endTimeStr = new Intl.DateTimeFormat('ja-JP', timeOptions).format(endDate);
-                return { date: dateStr, time: `${startTimeStr} - ${endTimeStr}`};
+    <!-- 
+        【修正】ステップ2: Reactアプリケーション本体 (Babelで実行)
+        Firebaseの準備完了を待ってからアプリを起動する仕組みを導入。
+    -->
+    <script type="text/babel">
+        // アプリケーションの起動処理を関数でラップ
+        function startApplication() {
+            console.log("Starting Application...");
+
+            // Firebase SDKが利用可能か最終チェック
+            if (!window.Firebase) {
+                console.error("Fatal Error: Firebase SDK failed to load.");
+                document.getElementById('root').innerHTML = '<div style="padding: 20px; color: red;">エラー：アプリケーションの起動に失敗しました。(Firebase SDKロード失敗)</div>';
+                return;
             }
-            return { date: dateStr, time: startTimeStr };
-        };
 
-        const generateGoogleCalendarLink = (app) => {
-            const startDate = timestampToDate(app.visitStartTimestamp);
-            if (!startDate) return '#';
-
-            const title = `${app.customerName} 様とのアポイント`;
+            // グローバルスコープから必要な機能を取得
+            const { initializeApp } = window.Firebase;
+            const { getAuth, signInAnonymously, onAuthStateChanged } = window.Firebase;
+            const { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, Timestamp, writeBatch, where, getDoc, getDocs, setDoc } = window.Firebase;
             
-            let endDate = timestampToDate(app.visitEndTimestamp);
-            if (!endDate) {
-                // 終了時間未設定時は1時間後と仮定
-                endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
-            }
+            const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-            // ローカルタイムでフォーマット
-            const toLocalFormat = (date) => {
-                const YYYY = date.getFullYear();
-                const MM = ('0' + (date.getMonth() + 1)).slice(-2);
-                const DD = ('0' + date.getDate()).slice(-2);
-                const hh = ('0' + date.getHours()).slice(-2);
-                const mm = ('0' + date.getMinutes()).slice(-2);
-                const ss = ('0' + date.getSeconds()).slice(-2);
-                return `${YYYY}${MM}${DD}T${hh}${mm}${ss}`;
+            // --- SVG Icons ---
+            const UserIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>;
+            const LocationIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>;
+            const BackIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" /></svg>;
+            const CalendarPlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm1 8a1 1 0 100-2h4a1 1 0 100 2H7z" clipRule="evenodd" /><path d="M13 14h-2v-2a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2z" /></svg>;
+            const InfoIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>;
+            const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clipRule="evenodd" /></svg>;
+            const CogIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.982.502 2.222-.098 3.142-.58.9-1.589 1.555-1.589 2.622s1.01 1.722 1.589 2.622c.6.92.638 2.16.098 3.142-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.286.948c.38 1.56 2.6 1.56 2.98 0a1.532 1.532 0 012.286-.948c1.372.836 2.942-.734 2.106-2.106a1.532 1.532 0 01-.098-3.142c.58-.9 1.589-1.555 1.589-2.622s-1.01-1.722-1.589-2.622a1.532 1.532 0 01.098-3.142c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.286-.948zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>;
+
+            const firebaseConfig = {
+                apiKey: "AIzaSyCqT_s4-XtGBkrX590DfYRQWPEdl-kE5-0",
+                authDomain: "apointo-a72bc.firebaseapp.com",
+                projectId: "apointo-a72bc",
+                storageBucket: "apointo-a72bc.appspot.com",
+                messagingSenderId: "1014142886306",
+                appId: "1:1014142886306:web:c97de02bb5f18b8af652fb",
+                measurementId: "G-XWDNVF3W7V"
             };
-            const dates = `${toLocalFormat(startDate)}/${toLocalFormat(endDate)}`;
-            const details = `目的: ${app.purpose}\n担当: ${app.salesPerson || '未設定'}\n連絡先: ${app.contactPerson || '未入力'}`;
-            const location = app.address || '';
-            const url = new URL('https://www.google.com/calendar/render');
-            url.searchParams.append('action', 'TEMPLATE');
-            url.searchParams.append('text', title);
-            url.searchParams.append('dates', dates);
-            url.searchParams.append('details', details);
-            url.searchParams.append('location', location);
-            // タイムゾーンを指定
-            url.searchParams.append('ctz', 'Asia/Tokyo');
-            return url.toString();
-        };
+            const appId = 'default-app-id';
 
-        const getDateColorClass = (date) => {
-            if (!date) return 'text-slate-800';
-            try {
-                // 祝日判定
-                if (window.japaneseHolidays && typeof window.japaneseHolidays.isHoliday === 'function' && window.japaneseHolidays.isHoliday(date)) {
-                    return 'text-rose-600';
+            // --- ユーティリティ関数 ---
+
+            // Timestampを安全にDateオブジェクトに変換する関数
+            const timestampToDate = (timestamp) => {
+                if (timestamp && typeof timestamp.toDate === 'function') {
+                    try {
+                        return timestamp.toDate();
+                    } catch (e) {
+                        console.error("Error calling toDate():", e, timestamp);
+                        return null;
+                    }
                 }
-            } catch (e) {
-                console.warn("祝日判定エラー", e);
-            }
-            const day = date.getDay();
-            if (day === 0) return 'text-rose-600'; // 日曜
-            if (day === 6) return 'text-sky-600'; // 土曜
-            return 'text-slate-800'; // 平日
-        };
-
-        // --- コンポーネント定義 ---
-
-        const ConfirmationModal = ({ isOpen, message, onConfirm, onCancel }) => {
-            if (!isOpen) return null;
-            return (
-                <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4 transition-opacity">
-                    <div className="bg-white rounded-xl shadow-2xl p-6 sm:p-8 max-w-sm w-full text-center transform transition-all scale-100">
-                        <h3 className="text-xl font-bold text-slate-800 mb-4">重複の確認</h3>
-                        <p className="text-slate-600 whitespace-pre-wrap mb-6">{message}</p>
-                        <div className="flex justify-center space-x-4">
-                            <button onClick={onCancel} className="w-full px-4 py-2.5 bg-slate-200 text-slate-800 font-semibold rounded-lg hover:bg-slate-300 transition focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2">キャンセル</button>
-                            <button onClick={onConfirm} className="w-full px-4 py-2.5 bg-rose-600 text-white font-semibold rounded-lg hover:bg-rose-700 transition focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2">このまま登録</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        const TeamIdEntry = ({ onTeamIdSubmit }) => {
-            const [inputTeamId, setInputTeamId] = useState('');
-            const handleSubmit = (e) => {
-                e.preventDefault();
-                if (inputTeamId.trim()) onTeamIdSubmit(inputTeamId.trim());
-            };
-            return (
-                <div className="bg-slate-100 min-h-screen flex items-center justify-center p-4">
-                    <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 text-center">
-                        <h1 className="text-3xl font-bold text-slate-800 mb-2">ようこそ</h1>
-                        <p className="text-slate-600 mb-8">チームで決めた「共有ID」を入力して開始してください。</p>
-                        <form onSubmit={handleSubmit}>
-                            <input type="text" value={inputTeamId} onChange={(e) => setInputTeamId(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition text-center text-lg shadow-inner" placeholder="例: team-okayama" required />
-                            <button type="submit" className="w-full mt-6 bg-sky-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-transform transform hover:scale-105 shadow-lg">アプリを開始</button>
-                        </form>
-                        <p className="text-xs text-slate-400 mt-8">共有IDは、チームのデータを一意に識別するためのものです。チーム全員で同じIDを使用してください。</p>
-                    </div>
-                </div>
-            );
-        };
-
-        const AppointmentCard = ({ app, onEdit, onDelete, onViewDetails, isDetailPage = false, isPast = false }) => {
-            const { date, time } = formatVisitTime(app.visitStartTimestamp, app.visitEndTimestamp);
-            
-            const startDate = timestampToDate(app.visitStartTimestamp);
-            const dateColorClass = getDateColorClass(startDate);
-            
-            const handleAddToCalendar = (e) => {
-                e.stopPropagation();
-                const url = generateGoogleCalendarLink(app);
-                if (url !== '#') {
-                    window.open(url, '_blank', 'noopener,noreferrer');
-                } else {
-                    alert('開始日時が設定されていないため、カレンダーに追加できません。');
+                // オブジェクト形式（{seconds: ..., nanoseconds: ...}）の場合も考慮
+                if (timestamp && typeof timestamp.seconds === 'number') {
+                    return new Date(timestamp.seconds * 1000);
                 }
+                return null;
             };
 
-            const showDetailsButton = !isDetailPage && !isPast;
-            const showSalesPerson = !isDetailPage || isPast;
+            const formatVisitTime = (startTimestamp, endTimestamp) => {
+                const startDate = timestampToDate(startTimestamp);
+                if (!startDate) return { date: '日時未設定', time: '' };
 
-            return (
-                <div className={`bg-white border border-slate-200 p-5 rounded-xl shadow-sm transition-shadow duration-300 ${!isPast && 'hover:shadow-lg'}`}>
-                    <div className="flex justify-between items-start">
-                        <div>
-                            {(!isDetailPage || isPast) && <p className={`font-semibold ${isPast ? dateColorClass.replace('slate-800', 'slate-500').replace('sky-600', 'sky-500').replace('rose-600', 'rose-500') : dateColorClass}`}>{date}</p>}
-                            <p className={`text-2xl font-bold mt-1 ${isPast ? 'text-slate-500' : 'text-slate-800'}`}>{time}</p>
-                        </div>
-                        <div className="flex space-x-1">
-                            <button onClick={handleAddToCalendar} title="Googleカレンダーに追加" className="p-2 text-green-600 hover:bg-green-100 rounded-full transition"><CalendarPlusIcon /></button>
-                            <button onClick={() => onEdit(app)} title="編集" className="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" /></svg></button>
-                            <button onClick={() => onDelete(app.id)} title="削除" className="p-2 text-rose-500 hover:bg-rose-100 rounded-full transition"><TrashIcon /></button>
-                        </div>
-                    </div>
-                    <div className="mt-4 pt-4 border-t border-slate-200">
-                        <h3 className={`text-lg font-bold ${isPast ? 'text-slate-600' : 'text-slate-800'}`}>{app.customerName} 様</h3>
-                        {app.address && <p className="text-slate-600 text-sm mt-1 flex items-center"><LocationIcon />{app.address}</p>}
-                        {app.contactPerson && <p className="text-slate-600 text-sm mt-1 flex items-center"><InfoIcon />{app.contactPerson}</p>}
-                        <p className="mt-3 text-sm text-slate-700 bg-slate-100 p-3 rounded-md whitespace-pre-wrap">{app.purpose}</p>
-                    </div>
-                    {(showSalesPerson || showDetailsButton) && (
-                        <div className="mt-4 flex justify-between items-center">
-                            {showSalesPerson ? <span className="text-sm font-medium text-slate-500 flex items-center"><UserIcon />担当: {app.salesPerson || '未設定'}</span> : <span />}
-                            {showDetailsButton && app.salesPerson && <button onClick={() => onViewDetails(app.salesPerson)} className="text-sm font-semibold text-sky-600 hover:text-sky-800 transition">詳細を見る →</button>}
-                        </div>
-                    )}
-                </div>
-            );
-        };
+                const dateOptions = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' };
+                const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
+                const dateStr = new Intl.DateTimeFormat('ja-JP', dateOptions).format(startDate);
+                const startTimeStr = new Intl.DateTimeFormat('ja-JP', timeOptions).format(startDate);
 
-        const DetailPage = ({ salesPerson, appointments, onBack, onEdit, onDelete, onViewPast }) => {
-            const now = new Date();
-            const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-            
-            const personAppointments = appointments
-                .filter(app => {
-                    const appDate = timestampToDate(app.visitStartTimestamp);
-                    return app.salesPerson === salesPerson && appDate && appDate > oneHourAgo;
-                })
-                .sort((a, b) => (timestampToDate(a.visitStartTimestamp)?.getTime() || 0) - (timestampToDate(b.visitStartTimestamp)?.getTime() || 0));
+                const endDate = timestampToDate(endTimestamp);
+                if (endDate) {
+                    const endTimeStr = new Intl.DateTimeFormat('ja-JP', timeOptions).format(endDate);
+                    return { date: dateStr, time: `${startTimeStr} - ${endTimeStr}`};
+                }
+                return { date: dateStr, time: startTimeStr };
+            };
 
-            const groupedAppointments = personAppointments.reduce((acc, app) => {
-                const jsDate = timestampToDate(app.visitStartTimestamp);
-                if (!jsDate) return acc;
+            const generateGoogleCalendarLink = (app) => {
+                const startDate = timestampToDate(app.visitStartTimestamp);
+                if (!startDate) return '#';
 
-                // ローカルタイムで日付キーを生成
-                const dateKey = `${jsDate.getFullYear()}-${('0' + (jsDate.getMonth() + 1)).slice(-2)}-${('0' + jsDate.getDate()).slice(-2)}`;
+                const title = `${app.customerName} 様とのアポイント`;
                 
-                if (!acc[dateKey]) acc[dateKey] = [];
-                acc[dateKey].push(app);
-                return acc;
-            }, {});
+                let endDate = timestampToDate(app.visitEndTimestamp);
+                if (!endDate) {
+                    // 終了時間未設定時は1時間後と仮定
+                    endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+                }
 
-            const sortedDates = Object.keys(groupedAppointments).sort();
+                // ローカルタイムでフォーマット
+                const toLocalFormat = (date) => {
+                    const YYYY = date.getFullYear();
+                    const MM = ('0' + (date.getMonth() + 1)).slice(-2);
+                    const DD = ('0' + date.getDate()).slice(-2);
+                    const hh = ('0' + date.getHours()).slice(-2);
+                    const mm = ('0' + date.getMinutes()).slice(-2);
+                    const ss = ('0' + date.getSeconds()).slice(-2);
+                    return `${YYYY}${MM}${DD}T${hh}${mm}${ss}`;
+                };
+                const dates = `${toLocalFormat(startDate)}/${toLocalFormat(endDate)}`;
+                const details = `目的: ${app.purpose}\n担当: ${app.salesPerson || '未設定'}\n連絡先: ${app.contactPerson || '未入力'}`;
+                const location = app.address || '';
+                const url = new URL('https://www.google.com/calendar/render');
+                url.searchParams.append('action', 'TEMPLATE');
+                url.searchParams.append('text', title);
+                url.searchParams.append('dates', dates);
+                url.searchParams.append('details', details);
+                url.searchParams.append('location', location);
+                // タイムゾーンを指定
+                url.searchParams.append('ctz', 'Asia/Tokyo');
+                return url.toString();
+            };
 
-            return (
-                <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-                    <header className="mb-8">
-                        <div className="flex justify-between items-center">
+            const getDateColorClass = (date) => {
+                if (!date) return 'text-slate-800';
+                try {
+                    // 祝日判定
+                    if (window.japaneseHolidays && typeof window.japaneseHolidays.isHoliday === 'function' && window.japaneseHolidays.isHoliday(date)) {
+                        return 'text-rose-600';
+                    }
+                } catch (e) {
+                    console.warn("祝日判定エラー", e);
+                }
+                const day = date.getDay();
+                if (day === 0) return 'text-rose-600'; // 日曜
+                if (day === 6) return 'text-sky-600'; // 土曜
+                return 'text-slate-800'; // 平日
+            };
+
+            // --- コンポーネント定義 ---
+
+            const ConfirmationModal = ({ isOpen, message, onConfirm, onCancel }) => {
+                if (!isOpen) return null;
+                return (
+                    <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4 transition-opacity">
+                        <div className="bg-white rounded-xl shadow-2xl p-6 sm:p-8 max-w-sm w-full text-center transform transition-all scale-100">
+                            <h3 className="text-xl font-bold text-slate-800 mb-4">重複の確認</h3>
+                            <p className="text-slate-600 whitespace-pre-wrap mb-6">{message}</p>
+                            <div className="flex justify-center space-x-4">
+                                <button onClick={onCancel} className="w-full px-4 py-2.5 bg-slate-200 text-slate-800 font-semibold rounded-lg hover:bg-slate-300 transition focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2">キャンセル</button>
+                                <button onClick={onConfirm} className="w-full px-4 py-2.5 bg-rose-600 text-white font-semibold rounded-lg hover:bg-rose-700 transition focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2">このまま登録</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const TeamIdEntry = ({ onTeamIdSubmit }) => {
+                const [inputTeamId, setInputTeamId] = useState('');
+                const handleSubmit = (e) => {
+                    e.preventDefault();
+                    if (inputTeamId.trim()) onTeamIdSubmit(inputTeamId.trim());
+                };
+                return (
+                    <div className="bg-slate-100 min-h-screen flex items-center justify-center p-4">
+                        <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 text-center">
+                            <h1 className="text-3xl font-bold text-slate-800 mb-2">ようこそ</h1>
+                            <p className="text-slate-600 mb-8">チームで決めた「共有ID」を入力して開始してください。</p>
+                            <form onSubmit={handleSubmit}>
+                                <input type="text" value={inputTeamId} onChange={(e) => setInputTeamId(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition text-center text-lg shadow-inner" placeholder="例: team-okayama" required />
+                                <button type="submit" className="w-full mt-6 bg-sky-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-transform transform hover:scale-105 shadow-lg">アプリを開始</button>
+                            </form>
+                            <p className="text-xs text-slate-400 mt-8">共有IDは、チームのデータを一意に識別するためのものです。チーム全員で同じIDを使用してください。</p>
+                        </div>
+                    </div>
+                );
+            };
+
+            const AppointmentCard = ({ app, onEdit, onDelete, onViewDetails, isDetailPage = false, isPast = false }) => {
+                const { date, time } = formatVisitTime(app.visitStartTimestamp, app.visitEndTimestamp);
+                
+                const startDate = timestampToDate(app.visitStartTimestamp);
+                const dateColorClass = getDateColorClass(startDate);
+                
+                const handleAddToCalendar = (e) => {
+                    e.stopPropagation();
+                    const url = generateGoogleCalendarLink(app);
+                    if (url !== '#') {
+                        window.open(url, '_blank', 'noopener,noreferrer');
+                    } else {
+                        alert('開始日時が設定されていないため、カレンダーに追加できません。');
+                    }
+                };
+
+                const showDetailsButton = !isDetailPage && !isPast;
+                const showSalesPerson = !isDetailPage || isPast;
+
+                return (
+                    <div className={`bg-white border border-slate-200 p-5 rounded-xl shadow-sm transition-shadow duration-300 ${!isPast && 'hover:shadow-lg'}`}>
+                        <div className="flex justify-between items-start">
+                            <div>
+                                {(!isDetailPage || isPast) && <p className={`font-semibold ${isPast ? dateColorClass.replace('slate-800', 'slate-500').replace('sky-600', 'sky-500').replace('rose-600', 'rose-500') : dateColorClass}`}>{date}</p>}
+                                <p className={`text-2xl font-bold mt-1 ${isPast ? 'text-slate-500' : 'text-slate-800'}`}>{time}</p>
+                            </div>
+                            <div className="flex space-x-1">
+                                <button onClick={handleAddToCalendar} title="Googleカレンダーに追加" className="p-2 text-green-600 hover:bg-green-100 rounded-full transition"><CalendarPlusIcon /></button>
+                                <button onClick={() => onEdit(app)} title="編集" className="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" /></svg></button>
+                                <button onClick={() => onDelete(app.id)} title="削除" className="p-2 text-rose-500 hover:bg-rose-100 rounded-full transition"><TrashIcon /></button>
+                            </div>
+                        </div>
+                        <div className="mt-4 pt-4 border-t border-slate-200">
+                            <h3 className={`text-lg font-bold ${isPast ? 'text-slate-600' : 'text-slate-800'}`}>{app.customerName} 様</h3>
+                            {app.address && <p className="text-slate-600 text-sm mt-1 flex items-center"><LocationIcon />{app.address}</p>}
+                            {app.contactPerson && <p className="text-slate-600 text-sm mt-1 flex items-center"><InfoIcon />{app.contactPerson}</p>}
+                            <p className="mt-3 text-sm text-slate-700 bg-slate-100 p-3 rounded-md whitespace-pre-wrap">{app.purpose}</p>
+                        </div>
+                        {(showSalesPerson || showDetailsButton) && (
+                            <div className="mt-4 flex justify-between items-center">
+                                {showSalesPerson ? <span className="text-sm font-medium text-slate-500 flex items-center"><UserIcon />担当: {app.salesPerson || '未設定'}</span> : <span />}
+                                {showDetailsButton && app.salesPerson && <button onClick={() => onViewDetails(app.salesPerson)} className="text-sm font-semibold text-sky-600 hover:text-sky-800 transition">詳細を見る →</button>}
+                            </div>
+                        )}
+                    </div>
+                );
+            };
+
+            const DetailPage = ({ salesPerson, appointments, onBack, onEdit, onDelete, onViewPast }) => {
+                const now = new Date();
+                const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+                
+                const personAppointments = appointments
+                    .filter(app => {
+                        const appDate = timestampToDate(app.visitStartTimestamp);
+                        return app.salesPerson === salesPerson && appDate && appDate > oneHourAgo;
+                    })
+                    .sort((a, b) => (timestampToDate(a.visitStartTimestamp)?.getTime() || 0) - (timestampToDate(b.visitStartTimestamp)?.getTime() || 0));
+
+                const groupedAppointments = personAppointments.reduce((acc, app) => {
+                    const jsDate = timestampToDate(app.visitStartTimestamp);
+                    if (!jsDate) return acc;
+
+                    // ローカルタイムで日付キーを生成
+                    const dateKey = `${jsDate.getFullYear()}-${('0' + (jsDate.getMonth() + 1)).slice(-2)}-${('0' + jsDate.getDate()).slice(-2)}`;
+                    
+                    if (!acc[dateKey]) acc[dateKey] = [];
+                    acc[dateKey].push(app);
+                    return acc;
+                }, {});
+
+                const sortedDates = Object.keys(groupedAppointments).sort();
+
+                return (
+                    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+                        <header className="mb-8">
+                            <div className="flex justify-between items-center">
+                                <button onClick={onBack} className="flex items-center text-slate-600 hover:text-slate-900 font-semibold transition mb-4">
+                                    <BackIcon />
+                                    戻る
+                                </button>
+                                <button onClick={onViewPast} className="text-sm font-semibold text-sky-600 hover:text-sky-800 transition mb-4">
+                                    過去のアポを見る →
+                                </button>
+                            </div>
+                            <h1 className="text-3xl sm:text-4xl font-bold text-slate-800">{salesPerson}さんのアポイント</h1>
+                            <p className="text-slate-500 mt-2">{personAppointments.length}件の今後の予定があります</p>
+                        </header>
+                        <main>
+                            {sortedDates.length > 0 ? (
+                                <div className="space-y-8">
+                                    {sortedDates.map(date => {
+                                        // Dateオブジェクトの生成（ローカルタイムゾーンで解釈）
+                                        const [year, month, day] = date.split('-').map(Number);
+                                        const dateObj = new Date(year, month - 1, day);
+
+                                        const dateOptions = { month: 'long', day: 'numeric', weekday: 'long' };
+                                        const formattedDate = new Intl.DateTimeFormat('ja-JP', dateOptions).format(dateObj);
+                                        const count = groupedAppointments[date].length;
+                                        const dateColorClass = getDateColorClass(dateObj);
+                                        return (
+                                            <section key={date}>
+                                                <h2 className={`text-xl font-bold mb-4 pb-2 border-b-2 border-sky-200 ${dateColorClass}`}>
+                                                    {formattedDate}
+                                                    <span className="text-base font-medium text-slate-500 ml-3">({count}件)</span>
+                                                </h2>
+                                                <div className="space-y-5">
+                                                    {groupedAppointments[date].map(app => (
+                                                        <AppointmentCard key={app.id} app={app} onEdit={onEdit} onDelete={onDelete} isDetailPage={true} />
+                                                    ))}
+                                                </div>
+                                            </section>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="text-center py-16 bg-white rounded-xl shadow-sm">
+                                    <p className="text-slate-500">今後のアポイントはありません。</p>
+                                </div>
+                            )}
+                        </main>
+                    </div>
+                );
+            };
+            
+            const PastAppointmentsPage = ({ appointments, onBack, onEdit, onDelete, title, filterPerson = null }) => {
+                const now = new Date();
+                const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
+                const pastAppointments = appointments
+                    .filter(app => {
+                        const appDate = timestampToDate(app.visitStartTimestamp);
+                        if (!appDate) return false;
+                        const isPast = appDate <= oneHourAgo;
+                        const personMatch = !filterPerson || app.salesPerson === filterPerson;
+                        return isPast && personMatch;
+                    })
+                    // 降順ソート
+                    .sort((a, b) => (timestampToDate(b.visitStartTimestamp)?.getTime() || 0) - (timestampToDate(a.visitStartTimestamp)?.getTime() || 0));
+
+                return (
+                    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+                        <header className="mb-8">
                             <button onClick={onBack} className="flex items-center text-slate-600 hover:text-slate-900 font-semibold transition mb-4">
                                 <BackIcon />
                                 戻る
                             </button>
-                            <button onClick={onViewPast} className="text-sm font-semibold text-sky-600 hover:text-sky-800 transition mb-4">
-                                過去のアポを見る →
-                            </button>
-                        </div>
-                        <h1 className="text-3xl sm:text-4xl font-bold text-slate-800">{salesPerson}さんのアポイント</h1>
-                        <p className="text-slate-500 mt-2">{personAppointments.length}件の今後の予定があります</p>
-                    </header>
-                    <main>
-                        {sortedDates.length > 0 ? (
-                            <div className="space-y-8">
-                                {sortedDates.map(date => {
-                                    // Dateオブジェクトの生成（ローカルタイムゾーンで解釈）
-                                    const [year, month, day] = date.split('-').map(Number);
-                                    const dateObj = new Date(year, month - 1, day);
-
-                                    const dateOptions = { month: 'long', day: 'numeric', weekday: 'long' };
-                                    const formattedDate = new Intl.DateTimeFormat('ja-JP', dateOptions).format(dateObj);
-                                    const count = groupedAppointments[date].length;
-                                    const dateColorClass = getDateColorClass(dateObj);
-                                    return (
-                                        <section key={date}>
-                                            <h2 className={`text-xl font-bold mb-4 pb-2 border-b-2 border-sky-200 ${dateColorClass}`}>
-                                                {formattedDate}
-                                                <span className="text-base font-medium text-slate-500 ml-3">({count}件)</span>
-                                            </h2>
-                                            <div className="space-y-5">
-                                                {groupedAppointments[date].map(app => (
-                                                    <AppointmentCard key={app.id} app={app} onEdit={onEdit} onDelete={onDelete} isDetailPage={true} />
-                                                ))}
-                                            </div>
-                                        </section>
-                                    );
-                                })}
-                            </div>
-                        ) : (
-                            <div className="text-center py-16 bg-white rounded-xl shadow-sm">
-                                <p className="text-slate-500">今後のアポイントはありません。</p>
-                            </div>
-                        )}
-                    </main>
-                </div>
-            );
-        };
-        
-        const PastAppointmentsPage = ({ appointments, onBack, onEdit, onDelete, title, filterPerson = null }) => {
-            const now = new Date();
-            const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-
-            const pastAppointments = appointments
-                .filter(app => {
-                    const appDate = timestampToDate(app.visitStartTimestamp);
-                    if (!appDate) return false;
-                    const isPast = appDate <= oneHourAgo;
-                    const personMatch = !filterPerson || app.salesPerson === filterPerson;
-                    return isPast && personMatch;
-                })
-                // 降順ソート
-                .sort((a, b) => (timestampToDate(b.visitStartTimestamp)?.getTime() || 0) - (timestampToDate(a.visitStartTimestamp)?.getTime() || 0));
-
-            return (
-                <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-                    <header className="mb-8">
-                        <button onClick={onBack} className="flex items-center text-slate-600 hover:text-slate-900 font-semibold transition mb-4">
-                            <BackIcon />
-                            戻る
-                        </button>
-                        <h1 className="text-3xl sm:text-4xl font-bold text-slate-800">{title}</h1>
-                        <p className="text-slate-500 mt-2">{pastAppointments.length}件の記録があります</p>
-                    </header>
-                    <main>
-                        {pastAppointments.length > 0 ? (
-                            <div className="space-y-5">
-                                {pastAppointments.map(app => (
-                                    <AppointmentCard key={app.id} app={app} onEdit={onEdit} onDelete={onDelete} isDetailPage={false} isPast={true} />
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center py-16 bg-white rounded-xl shadow-sm">
-                                <p className="text-slate-500">過去のアポイントはありません。</p>
-                            </div>
-                        )}
-                    </main>
-                </div>
-            );
-        };
-
-        const WeeklyPage = ({ appointments, colorMap, onBack, onViewDetails }) => {
-            const [currentWeekStart, setCurrentWeekStart] = useState(() => {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                const dayOfWeek = today.getDay();
-                // 火曜日始まりの設定
-                const daysSinceTuesday = (dayOfWeek + 7 - 2) % 7;
-                
-                const tuesday = new Date(today);
-                tuesday.setDate(today.getDate() - daysSinceTuesday);
-                return tuesday;
-            });
-            
-            const DEFAULT_COLOR = 'bg-gray-200 text-gray-800 border-gray-400';
-
-            const getSalespersonColor = useCallback((name) => {
-                if (!name) return DEFAULT_COLOR;
-                return (colorMap && colorMap[name]) || DEFAULT_COLOR;
-            }, [colorMap]);
-
-            const handlePrevWeek = () => {
-                setCurrentWeekStart(prev => {
-                    const newDate = new Date(prev);
-                    newDate.setDate(newDate.getDate() - 7);
-                    return newDate;
-                });
-            };
-
-            const handleNextWeek = () => {
-                setCurrentWeekStart(prev => {
-                    const newDate = new Date(prev);
-                    newDate.setDate(newDate.getDate() + 7);
-                    return newDate;
-                });
-            };
-
-            const weekDays = Array.from({ length: 7 }).map((_, i) => {
-                const date = new Date(currentWeekStart);
-                date.setDate(date.getDate() + i);
-                return date;
-            });
-            
-            const weekEnd = new Date(weekDays[6]);
-            weekEnd.setHours(23, 59, 59, 999);
-
-            const weekAppointments = appointments.filter(app => {
-                const appDate = timestampToDate(app.visitStartTimestamp);
-                return appDate && appDate >= currentWeekStart && appDate <= weekEnd;
-            });
-            
-            const salesPersonsInWeek = [...new Set(weekAppointments.map(app => app.salesPerson).filter(Boolean))].sort();
-
-            return (
-                <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-                    <header className="mb-8">
-                        <button onClick={onBack} className="flex items-center text-slate-600 hover:text-slate-900 font-semibold transition mb-4">
-                            <BackIcon />
-                            戻る
-                        </button>
-                        <div className="flex justify-center items-center mb-4">
-                            <button onClick={handlePrevWeek} className="p-2 rounded-full hover:bg-slate-200 transition">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                            </button>
-                            <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 mx-4 text-center">
-                                {`${currentWeekStart.getFullYear()}年 ${currentWeekStart.getMonth() + 1}月`}
-                            </h1>
-                            <button onClick={handleNextWeek} className="p-2 rounded-full hover:bg-slate-200 transition">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                            </button>
-                        </div>
-                    </header>
-                    <main>
-                        <div className="overflow-x-auto bg-white p-2 rounded-xl shadow-lg">
-                            <table className="w-full border-collapse min-w-[800px]">
-                                <thead>
-                                    <tr>
-                                        <th className="p-1 border border-slate-200 w-28 sticky left-0 bg-white/75 backdrop-blur-sm text-xs sm:text-sm z-10">担当者</th>
-                                        {weekDays.map(day => (
-                                            <th key={day.toISOString()} className={`p-1 border border-slate-200 text-xs sm:text-sm ${getDateColorClass(day)}`}>
-                                                {day.toLocaleDateString('ja-JP', { weekday: 'short' })}
-                                                <span className="block text-sm sm:text-base">{day.getDate()}</span>
-                                            </th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {salesPersonsInWeek.map(person => (
-                                        <tr key={person}>
-                                            <td className="p-1 border border-slate-200 font-bold align-top sticky left-0 bg-white/75 backdrop-blur-sm text-xs sm:text-sm z-10">
-                                                <button onClick={() => onViewDetails(person)} className="text-sky-600 hover:underline w-full text-left p-1">
-                                                    {person}
-                                                </button>
-                                            </td>
-                                            {weekDays.map(day => {
-                                                const dayAppointments = weekAppointments
-                                                    .filter(app => {
-                                                        const appDate = timestampToDate(app.visitStartTimestamp);
-                                                        return app.salesPerson === person && appDate && appDate.toDateString() === day.toDateString()
-                                                    })
-                                                    .sort((a,b) => (timestampToDate(a.visitStartTimestamp)?.getTime() || 0) - (timestampToDate(b.visitStartTimestamp)?.getTime() || 0));
-                                                return (
-                                                    <td key={day.toISOString()} className="p-1 border border-slate-200 align-top">
-                                                        <div className="space-y-1">
-                                                            {dayAppointments.map(app => (
-                                                                <div key={app.id} className={`p-1 rounded border-l-4 ${getSalespersonColor(app.salesPerson)}`}>
-                                                                    <p className="font-bold text-[10px]">{formatVisitTime(app.visitStartTimestamp, app.visitEndTimestamp).time}</p>
-                                                                    <p className="font-semibold text-[11px] truncate">{app.customerName}</p>
-                                                                    <p className="text-[10px] opacity-75 truncate">{app.purpose}</p>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </td>
-                                                );
-                                            })}
-                                        </tr>
+                            <h1 className="text-3xl sm:text-4xl font-bold text-slate-800">{title}</h1>
+                            <p className="text-slate-500 mt-2">{pastAppointments.length}件の記録があります</p>
+                        </header>
+                        <main>
+                            {pastAppointments.length > 0 ? (
+                                <div className="space-y-5">
+                                    {pastAppointments.map(app => (
+                                        <AppointmentCard key={app.id} app={app} onEdit={onEdit} onDelete={onDelete} isDetailPage={false} isPast={true} />
                                     ))}
-                                </tbody>
-                            </table>
-                            {salesPersonsInWeek.length === 0 && <div className="text-center p-8 text-slate-500">この週のアポイントはありません。</div>}
-                        </div>
-                    </main>
-                </div>
-            );
-        };
-        
-        const SalespersonManager = ({ db, teamId, allSalespersons, onClose }) => {
-            const [isDeleting, setIsDeleting] = useState(false);
-            
-            const handleDelete = async (nameToDelete) => {
-                const confirmation = window.confirm(`本当に「${nameToDelete}」さんを完全削除しますか？\n\nこの担当者が設定されている過去の全てのアポイントから名前が削除されます。\nこの操作は元に戻せません。`);
-                if (!confirmation) return;
-
-                const password = window.prompt("削除を実行するには、設定したパスワードを入力してください。\n（注意：このパスワード管理機能は簡易的なものです）");
-                if (password === null) return;
-
-                setIsDeleting(true);
-                try {
-                    // 注意：クライアントサイドでのパスワード検証は非推奨です。
-                    const securityDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'security');
-                    const securityDoc = await getDoc(securityDocRef);
-
-                    if (!securityDoc.exists() || securityDoc.data().deletePassword !== password) {
-                        alert('パスワードが違うか、設定されていません。');
-                        setIsDeleting(false);
-                        return;
-                    }
-
-                    const collectionName = `${teamId}_appointments`;
-                    const appointmentsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
-                    const q = query(appointmentsCollectionRef, where("salesPerson", "==", nameToDelete));
-                    
-                    const querySnapshot = await getDocs(q);
-                    
-                    if (querySnapshot.empty) {
-                        alert(`「${nameToDelete}」さんのアポイントは見つかりませんでした。この名前は過去のアポイントには使用されていないようです。`);
-                        setIsDeleting(false);
-                        return;
-                    }
-
-                    const batch = writeBatch(db);
-                    querySnapshot.forEach((doc) => {
-                        batch.update(doc.ref, { salesPerson: "" });
-                    });
-                    
-                    await batch.commit();
-                    alert(`「${nameToDelete}」さんの名前を関連アポイント（${querySnapshot.size}件）から削除しました。`);
-                } catch (error) {
-                    console.error("Error deleting salesperson:", error);
-                    alert("削除中にエラーが発生しました。権限設定を確認してください。");
-                } finally {
-                    setIsDeleting(false);
-                }
-            };
-
-            return (
-                <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-2xl p-6 sm:p-8 max-w-md w-full">
-                        <h2 className="text-2xl font-bold text-slate-800 mb-6">担当者 完全削除</h2>
-                        <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                            {allSalespersons.length > 0 ? allSalespersons.map(name => (
-                                <div key={name} className="flex justify-between items-center bg-slate-100 p-2 rounded-lg">
-                                    <span className="text-slate-800">{name}</span>
-                                    <button onClick={() => handleDelete(name)} disabled={isDeleting} title={`「${name}」さんを完全削除`} className="p-1 text-rose-500 hover:bg-rose-100 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed">
-                                        <TrashIcon />
-                                    </button>
                                 </div>
-                            )) : <p className="text-slate-500 text-center py-4">現在登録されている担当者はいません。</p>}
-                        </div>
-                        {isDeleting && <p className="text-center text-sky-600 mt-4">削除処理を実行中...</p>}
-                        <button onClick={onClose} disabled={isDeleting} className="w-full mt-6 px-4 py-2.5 bg-slate-200 text-slate-800 font-semibold rounded-lg hover:bg-slate-300 transition disabled:opacity-50">閉じる</button>
+                            ) : (
+                                <div className="text-center py-16 bg-white rounded-xl shadow-sm">
+                                    <p className="text-slate-500">過去のアポイントはありません。</p>
+                                </div>
+                            )}
+                        </main>
                     </div>
-                </div>
-            );
-        };
-        
-        // メインアプリケーションコンポーネント
-        function App() {
-            const [db, setDb] = useState(null);
-            const [user, setUser] = useState(null);
-            const [isAuthReady, setIsAuthReady] = useState(false);
-            const [teamId, setTeamId] = useState('');
-            const [appointments, setAppointments] = useState([]);
-            const [isLoading, setIsLoading] = useState(true);
-            // 【改善】エラー状態管理
-            const [error, setError] = useState(null);
-            
-            // フォームの状態
-            const [customerName, setCustomerName] = useState('');
-            const [contactPerson, setContactPerson] = useState('');
-            const [address, setAddress] = useState('');
-            const [visitDate, setVisitDate] = useState('');
-            const [visitStartTime, setVisitStartTime] = useState('');
-            const [visitEndTime, setVisitEndTime] = useState('');
-            const [purpose, setPurpose] = useState('');
-            const [salesPerson, setSalesPerson] = useState('');
-            const [editingId, setEditingId] = useState(null);
-            const formRef = useRef(null);
-            
-            // フィルターの状態
-            const [filterDate, setFilterDate] = useState('');
-            const [filterSalesPerson, setFilterSalesPerson] = useState('');
-            
-            // モーダルの状態
-            const [isModalOpen, setIsModalOpen] = useState(false);
-            const [modalMessage, setModalMessage] = useState('');
-            const [pendingAppointment, setPendingAppointment] = useState(null);
+                );
+            };
 
-            // 画面遷移の状態
-            const [currentView, setCurrentView] = useState({ view: 'main', data: null });
-            
-            // 担当者と色の管理
-            const [allSalespersons, setAllSalespersons] = useState([]);
-            const [colorMap, setColorMap] = useState({});
+            const WeeklyPage = ({ appointments, colorMap, onBack, onViewDetails }) => {
+                const [currentWeekStart, setCurrentWeekStart] = useState(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const dayOfWeek = today.getDay();
+                    // 火曜日始まりの設定
+                    const daysSinceTuesday = (dayOfWeek + 7 - 2) % 7;
+                    
+                    const tuesday = new Date(today);
+                    tuesday.setDate(today.getDate() - daysSinceTuesday);
+                    return tuesday;
+                });
+                
+                const DEFAULT_COLOR = 'bg-gray-200 text-gray-800 border-gray-400';
 
-            // 使用可能なカラークラスの定義
-            const colorClasses = useMemo(() => [
-                'bg-sky-50 text-sky-800 border-sky-400',     'bg-emerald-50 text-emerald-800 border-emerald-400',
-                'bg-amber-50 text-amber-800 border-amber-400', 'bg-rose-50 text-rose-800 border-rose-400',
-                'bg-indigo-50 text-indigo-800 border-indigo-400','bg-fuchsia-50 text-fuchsia-800 border-fuchsia-400',
-                'bg-lime-50 text-lime-800 border-lime-400',     'bg-cyan-50 text-cyan-800 border-cyan-400',
-                'bg-pink-50 text-pink-800 border-pink-400',     'bg-purple-50 text-purple-800 border-purple-400',
-                'bg-green-50 text-green-800 border-green-400',   'bg-yellow-50 text-yellow-800 border-yellow-400',
-                'bg-red-50 text-red-800 border-red-400',       'bg-blue-50 text-blue-800 border-blue-400',
-                'bg-orange-50 text-orange-800 border-orange-400', 'bg-teal-50 text-teal-800 border-teal-400',
-                'bg-violet-50 text-violet-800 border-violet-400', 'bg-gray-200 text-gray-800 border-gray-400'
-            ], []);
+                const getSalespersonColor = useCallback((name) => {
+                    if (!name) return DEFAULT_COLOR;
+                    return (colorMap && colorMap[name]) || DEFAULT_COLOR;
+                }, [colorMap]);
 
-            const navigateTo = useCallback((view, data = null) => {
-                const newState = { view, data };
-                // 状態が変更された場合のみ遷移
-                if (!currentView || currentView.view !== newState.view || JSON.stringify(currentView.data) !== JSON.stringify(newState.data)) {
-                    // 初期ロード時以外はpushState
-                    if (window.history.state !== null) {
-                         window.history.pushState(newState, '');
-                    }
-                    setCurrentView(newState);
-                }
-            }, [currentView]);
-
-            // ブラウザバック/フォワード対応
-            useEffect(() => {
-                const handlePopState = (event) => {
-                    setCurrentView(event.state || { view: 'main', data: null });
+                const handlePrevWeek = () => {
+                    setCurrentWeekStart(prev => {
+                        const newDate = new Date(prev);
+                        newDate.setDate(newDate.getDate() - 7);
+                        return newDate;
+                    });
                 };
-                // 初期状態の設定
-                if (window.history.state === null) {
-                    window.history.replaceState({ view: 'main', data: null }, '');
-                }
-                window.addEventListener('popstate', handlePopState);
-                return () => window.removeEventListener('popstate', handlePopState);
-            }, []);
 
-            // チームIDの復元
-            useEffect(() => {
-                const savedTeamId = localStorage.getItem('sales-app-team-id');
-                if (savedTeamId) setTeamId(savedTeamId);
-            }, []);
-
-            // Firebase初期化と認証
-            useEffect(() => {
-                try {
-                    const app = initializeApp(firebaseConfig);
-                    const authInstance = getAuth(app);
-                    const dbInstance = getFirestore(app);
-                    setDb(dbInstance);
-                    const unsubscribeAuth = onAuthStateChanged(authInstance, async (currentUser) => {
-                        if (!currentUser) {
-                            try {
-                                // 匿名認証
-                                await signInAnonymously(authInstance);
-                            } catch (error) {
-                                console.error("Authentication failed:", error);
-                                setError("認証に失敗しました。Firebaseで匿名認証が有効か確認してください。");
-                            }
-                        }
-                        setUser(authInstance.currentUser);
-                        setIsAuthReady(true);
+                const handleNextWeek = () => {
+                    setCurrentWeekStart(prev => {
+                        const newDate = new Date(prev);
+                        newDate.setDate(newDate.getDate() + 7);
+                        return newDate;
                     });
-                    return () => unsubscribeAuth();
-                } catch (error) {
-                    console.error("Firebase initialization failed:", error);
-                    setError("アプリの初期化に失敗しました。Firebaseの設定(APIキーなど)が正しいか確認してください。");
-                }
-            }, []);
+                };
 
-            // Firestoreからカラーマップを読み込む
-            useEffect(() => {
-                if (!isAuthReady || !db || !teamId) return;
-                
-                const colorMapRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', `${teamId}_color_map`);
-                const unsubscribe = onSnapshot(colorMapRef, (docSnap) => {
-                    if (docSnap.exists()) {
-                        setColorMap(docSnap.data() || {});
-                    } else {
-                        setColorMap({});
-                    }
-                }, (error) => {
-                    console.error("Error fetching color map:", error);
-                    // カラーマップの読み込み失敗は致命的ではないため、エラー表示はしない
+                const weekDays = Array.from({ length: 7 }).map((_, i) => {
+                    const date = new Date(currentWeekStart);
+                    date.setDate(date.getDate() + i);
+                    return date;
                 });
-                return () => unsubscribe();
-            }, [isAuthReady, db, teamId]);
-
-            // アポイントメントデータの読み込み
-            useEffect(() => {
-                if (!isAuthReady || !db || !teamId) return;
-                setIsLoading(true);
-                setError(null); // 読み込み開始時にエラーをリセット
-
-                const collectionName = `${teamId}_appointments`;
-                const appointmentsCollection = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
-                // visitStartTimestampでソート
-                const q = query(appointmentsCollection, orderBy('visitStartTimestamp', 'asc'));
                 
-                const unsubscribe = onSnapshot(q, (snapshot) => {
-                    const appointmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setAppointments(appointmentsData);
-                    const salesPeople = [...new Set(appointmentsData.map(app => app.salesPerson).filter(Boolean))].sort();
-                    setAllSalespersons(salesPeople);
-                    setIsLoading(false);
-                }, (error) => {
-                    console.error("Error fetching appointments:", error);
-                    setError(`データの読み込みに失敗しました。(Team ID: ${teamId})\nFirestoreのセキュリティルールが正しく設定されているか確認してください。\n詳細: ${error.message}`);
-                    setIsLoading(false);
-                });
-                return () => unsubscribe();
-            }, [isAuthReady, db, teamId]);
+                const weekEnd = new Date(weekDays[6]);
+                weekEnd.setHours(23, 59, 59, 999);
 
-            // 新しい担当者に色を割り当ててFirestoreに保存する
-            useEffect(() => {
-                if (!db || !teamId || allSalespersons.length === 0) return;
-
-                const newPersons = allSalespersons.filter(p => p && !colorMap[p]);
-                if (newPersons.length > 0) {
-                    const newColorMapUpdates = {};
-                    const usedColors = Object.values(colorMap);
-                    let availableColors = colorClasses.filter(c => !usedColors.includes(c));
-
-                    newPersons.forEach(person => {
-                        if (availableColors.length > 0) {
-                            newColorMapUpdates[person] = availableColors.shift();
-                        } else {
-                            // 空きがなければランダムに割り当てる
-                            newColorMapUpdates[person] = colorClasses[Math.floor(Math.random() * colorClasses.length)];
-                        }
-                    });
-
-                    const colorMapRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', `${teamId}_color_map`);
-                    setDoc(colorMapRef, newColorMapUpdates, { merge: true }).catch(error => console.error("Error updating color map:", error));
-                }
-            }, [allSalespersons, colorMap, db, teamId, colorClasses]);
-
-            // フィルタリング処理
-            const filteredAppointments = useMemo(() => {
-                const now = new Date();
-                const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-
-                return appointments.filter(app => {
+                const weekAppointments = appointments.filter(app => {
                     const appDate = timestampToDate(app.visitStartTimestamp);
-                    if (!appDate) return false;
-                    
-                    const isCurrent = appDate > oneHourAgo;
-                    
-                    // 【修正】日付比較（ローカルタイムゾーンでの比較）
-                    const appDateString = `${appDate.getFullYear()}-${('0' + (appDate.getMonth() + 1)).slice(-2)}-${('0' + appDate.getDate()).slice(-2)}`;
-                    const dateMatch = !filterDate || (appDateString === filterDate);
-                    
-                    const personMatch = !filterSalesPerson || app.salesPerson === filterSalesPerson;
-                    return isCurrent && dateMatch && personMatch;
+                    return appDate && appDate >= currentWeekStart && appDate <= weekEnd;
                 });
-            }, [appointments, filterDate, filterSalesPerson]);
-
-            // --- ハンドラ関数 ---
-
-            const handleTeamIdSubmit = (id) => {
-                localStorage.setItem('sales-app-team-id', id);
-                setTeamId(id);
-            };
-
-            const handleChangeTeamId = () => {
-                if (window.confirm('チームIDを変更しますか？\n（入力中の内容は失われます）')) {
-                    localStorage.removeItem('sales-app-team-id');
-                    setTeamId('');
-                    setAppointments([]);
-                    setColorMap({});
-                    resetForm();
-                    navigateTo('main');
-                    setError(null); // エラーもリセット
-                }
-            };
-
-            const proceedWithSubmission = async (appointmentData) => {
-                if (!teamId || !db) return;
-                try {
-                    const collectionName = `${teamId}_appointments`;
-                    const appointmentsCollection = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
-                    if (editingId) {
-                        const docRef = doc(db, 'artifacts', appId, 'public', 'data', collectionName, editingId);
-                        // 【修正】更新時はupdatedAtを設定
-                        await updateDoc(docRef, {
-                            ...appointmentData,
-                            updatedAt: serverTimestamp()
-                        });
-                    } else {
-                        // 【修正】新規作成時はcreatedAtを設定
-                        await addDoc(appointmentsCollection, {
-                            ...appointmentData,
-                            createdAt: serverTimestamp()
-                        });
-                    }
-                    resetForm();
-                } catch (error) { 
-                    console.error("Error saving appointment: ", error); 
-                    alert('アポイントの保存中にエラーが発生しました。権限設定を確認してください。'); 
-                }
-            };
-
-            const handleSubmit = async (e) => {
-                e.preventDefault();
                 
-                // 【改善】担当者名の前後の空白を削除
-                const trimmedSalesPerson = salesPerson.trim();
+                const salesPersonsInWeek = [...new Set(weekAppointments.map(app => app.salesPerson).filter(Boolean))].sort();
 
-                if (!customerName || !visitDate || !visitStartTime || !purpose || !trimmedSalesPerson) {
-                    alert('必須項目（お名前、訪問日、開始時間、目的、営業担当）を入力してください。');
-                    return;
-                }
-                
-                const startTime = new Date(`${visitDate}T${visitStartTime}`);
-                const endTime = visitEndTime ? new Date(`${visitDate}T${visitEndTime}`) : null;
-
-                // 終了時刻が開始時刻より前の場合はエラーとする
-                if (endTime && startTime >= endTime) {
-                    alert('終了時間は開始時間より後に設定してください。');
-                    return;
-                }
-
-                const newStartTimestamp = Timestamp.fromDate(startTime);
-                const newEndTimestamp = endTime ? Timestamp.fromDate(endTime) : null;
-
-                // 重複チェック
-                const conflictingAppointment = appointments.find(app => {
-                    if (editingId && app.id === editingId) return false;
-                    if (app.salesPerson !== trimmedSalesPerson) return false;
-                    
-                    const existingStart = timestampToDate(app.visitStartTimestamp);
-                    if (!existingStart) return false;
-
-                    // 【改善】終了時刻がない場合は1時間とみなして重複チェックを行う
-                    const existingEnd = timestampToDate(app.visitEndTimestamp) || new Date(existingStart.getTime() + 60 * 60 * 1000);
-                    
-                    const newStart = startTime;
-                    const newEnd = endTime || new Date(startTime.getTime() + 60 * 60 * 1000);
-
-                    // (StartA < EndB) and (EndA > StartB)
-                    return newStart < existingEnd && newEnd > existingStart;
-                });
-
-                const appointmentData = { 
-                    customerName, 
-                    contactPerson, 
-                    address, 
-                    visitStartTimestamp: newStartTimestamp, 
-                    visitEndTimestamp: newEndTimestamp, 
-                    purpose, 
-                    salesPerson: trimmedSalesPerson, 
-                    authorId: user?.uid
-                };
-
-                if (conflictingAppointment) {
-                    const { date, time } = formatVisitTime(conflictingAppointment.visitStartTimestamp, conflictingAppointment.visitEndTimestamp);
-                    const message = `警告：${trimmedSalesPerson}さんには、指定した時間と重複する別のアポイントが登録されています。\n\n` + `重複アポ: ${conflictingAppointment.customerName} 様\n` + `日時: ${date} ${time}`;
-                    setModalMessage(message);
-                    setPendingAppointment(appointmentData);
-                    setIsModalOpen(true);
-                } else {
-                    await proceedWithSubmission(appointmentData);
-                }
-            };
-
-            const handleConfirmSubmit = async () => {
-                if (pendingAppointment) await proceedWithSubmission(pendingAppointment);
-                setIsModalOpen(false);
-                setPendingAppointment(null);
-            };
-
-            const handleCancelSubmit = () => {
-                setIsModalOpen(false);
-                setPendingAppointment(null);
-            };
-
-            const handleEdit = (appointment) => {
-                const toDateInputFormat = (date) => {
-                    const year = date.getFullYear();
-                    const month = ('0' + (date.getMonth() + 1)).slice(-2);
-                    const day = ('0' + date.getDate()).slice(-2);
-                    return `${year}-${month}-${day}`;
-                };
-                const toTimeInputFormat = (date) => `${('0'+date.getHours()).slice(-2)}:${('0'+date.getMinutes()).slice(-2)}`;
-
-                // メイン画面に戻る
-                if (currentView.view !== 'main') {
-                    navigateTo('main');
-                }
-
-                // 画面遷移後にフォームを設定するためにsetTimeoutを使用
-                setTimeout(() => {
-                    setEditingId(appointment.id);
-                    setCustomerName(appointment.customerName);
-                    setContactPerson(appointment.contactPerson || '');
-                    setAddress(appointment.address || '');
-                    
-                    const startDate = timestampToDate(appointment.visitStartTimestamp);
-                    if (startDate) {
-                        setVisitDate(toDateInputFormat(startDate));
-                        setVisitStartTime(toTimeInputFormat(startDate));
-                    } else {
-                        setVisitDate('');
-                        setVisitStartTime('');
-                    }
-                    
-                    const endDate = timestampToDate(appointment.visitEndTimestamp);
-                    setVisitEndTime(endDate ? toTimeInputFormat(endDate) : '');
-                    
-                    setPurpose(appointment.purpose);
-                    setSalesPerson(appointment.salesPerson || '');
-                    
-                    // フォームまでスクロール
-                    if (formRef.current) {
-                        formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }
-                }, 100); // 画面遷移を考慮して少し待つ
-            };
-
-            const handleDelete = async (id) => {
-                if (window.confirm('このアポイントを削除してもよろしいですか？')) {
-                    if (!db || !teamId) return;
-                    try {
-                        const collectionName = `${teamId}_appointments`;
-                        const docRef = doc(db, 'artifacts', appId, 'public', 'data', collectionName, id);
-                        await deleteDoc(docRef);
-                        // 削除したものが編集中のものだった場合、フォームをリセット
-                        if (editingId === id) {
-                            resetForm();
-                        }
-                    } catch (error) { 
-                        console.error("Error deleting appointment: ", error); 
-                        alert('アポイントの削除中にエラーが発生しました。権限設定を確認してください。'); 
-                    }
-                }
-            };
-
-            const resetForm = () => {
-                setCustomerName(''); setContactPerson(''); setAddress('');
-                setVisitDate(''); setVisitStartTime(''); setVisitEndTime('');
-                setPurpose(''); setSalesPerson(''); setEditingId(null);
-            };
-
-            // --- レンダリング制御 ---
-
-            // 【改善】エラー画面の表示
-            if (error && (!isAuthReady || !teamId)) {
-                // 初期化・認証・TeamID入力前のエラー
                 return (
-                    <div className="min-h-screen flex items-center justify-center bg-rose-50 p-4">
-                        <div className="bg-white p-8 rounded-xl shadow-xl border border-rose-200 max-w-lg w-full">
-                            <h1 className="text-2xl font-bold text-rose-700 mb-4">アプリケーションエラー</h1>
-                            <p className="text-slate-700 mb-6 whitespace-pre-wrap">{error}</p>
-                            <button onClick={() => window.location.reload()} className="w-full bg-sky-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-700 transition">再読み込み</button>
-                        </div>
-                    </div>
-                );
-            }
-
-            // ローディングとチームID入力画面の制御
-            if (!isAuthReady) return <div className="flex justify-center items-center h-screen text-slate-500">認証中...</div>;
-            if (!teamId) return <TeamIdEntry onTeamIdSubmit={handleTeamIdSubmit} />;
-
-            // データ読み込みエラー（TeamID設定後）
-            if (error) {
-                    return (
-                    <div className="min-h-screen flex items-center justify-center bg-rose-50 p-4">
-                        <div className="bg-white p-8 rounded-xl shadow-xl border border-rose-200 max-w-lg w-full">
-                            <h1 className="text-2xl font-bold text-rose-700 mb-4">データ読み込みエラー</h1>
-                            <p className="text-slate-700 mb-6 whitespace-pre-wrap">{error}</p>
-                            <div className="flex space-x-4">
-                                <button onClick={handleChangeTeamId} className="w-full bg-slate-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-slate-600 transition">チームIDを変更</button>
-                                <button onClick={() => window.location.reload()} className="w-full bg-sky-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-700 transition">再試行</button>
-                            </div>
-                        </div>
-                    </div>
-                );
-            }
-
-
-            // メイン画面の定義
-            const mainView = (
-                <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-                    <header className="text-center mb-10 relative">
-                        <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-800">アポイント共有</h1>
-                        <p className="text-slate-500 mt-2">チームID: <span className="font-semibold text-sky-600">{teamId}</span></p>
-                        <button onClick={handleChangeTeamId} className="absolute top-0 right-0 text-xs text-slate-500 hover:text-sky-600 underline">ID変更</button>
-                    </header>
-                    {/* 【改善】フォーム部分をstickyにして操作性を向上 */}
-                    <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <div ref={formRef} className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-lg h-fit lg:sticky lg:top-6">
-                            <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
-                                <h2 className="text-2xl font-bold">{editingId ? 'アポイント編集' : '新規登録'}</h2>
-                                <button onClick={() => navigateTo('settings')} title="担当者管理・設定" className="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition">
-                                    <CogIcon />
+                    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+                        <header className="mb-8">
+                            <button onClick={onBack} className="flex items-center text-slate-600 hover:text-slate-900 font-semibold transition mb-4">
+                                <BackIcon />
+                                戻る
+                            </button>
+                            <div className="flex justify-center items-center mb-4">
+                                <button onClick={handlePrevWeek} className="p-2 rounded-full hover:bg-slate-200 transition">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                                </button>
+                                <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 mx-4 text-center">
+                                    {`${currentWeekStart.getFullYear()}年 ${currentWeekStart.getMonth() + 1}月`}
+                                </h1>
+                                <button onClick={handleNextWeek} className="p-2 rounded-full hover:bg-slate-200 transition">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                                 </button>
                             </div>
-                            <form onSubmit={handleSubmit} className="space-y-5">
-                                <div><label htmlFor="customerName" className="block text-sm font-semibold text-slate-700 mb-1">お名前 <span className="text-rose-500">*</span></label><input type="text" id="customerName" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required /></div>
-                                <div><label htmlFor="address" className="block text-sm font-semibold text-slate-700 mb-1">住所</label><input type="text" id="address" value={address} onChange={(e) => setAddress(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" /></div>
-                                <div><label htmlFor="contactPerson" className="block text-sm font-semibold text-slate-700 mb-1">その他連絡先など</label><input type="text" id="contactPerson" value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" /></div>
-                                <div><label htmlFor="visitDate" className="block text-sm font-semibold text-slate-700 mb-1">訪問日 <span className="text-rose-500">*</span></label><input type="date" id="visitDate" value={visitDate} onChange={(e) => setVisitDate(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required /></div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div><label htmlFor="visitStartTime" className="block text-sm font-semibold text-slate-700 mb-1">開始時間 <span className="text-rose-500">*</span></label><input type="time" id="visitStartTime" value={visitStartTime} onChange={(e) => setVisitStartTime(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required /></div>
-                                    <div><label htmlFor="visitEndTime" className="block text-sm font-semibold text-slate-700 mb-1">終了時間</label><input type="time" id="visitEndTime" value={visitEndTime} onChange={(e) => setVisitEndTime(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" /></div>
-                                </div>
-                                <div>
-                                    <label htmlFor="salesPerson" className="block text-sm font-semibold text-slate-700 mb-1">営業担当 <span className="text-rose-500">*</span></label>
-                                    {/* 入力値はそのまま保持し、送信時にtrimする */}
-                                    <input type="text" list="salespersons-list" id="salesPerson" value={salesPerson} onChange={(e) => setSalesPerson(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required />
-                                    <datalist id="salespersons-list">
-                                        {allSalespersons.map(person => <option key={person} value={person} />)}
-                                    </datalist>
-                                </div>
-                                <div><label htmlFor="purpose" className="block text-sm font-semibold text-slate-700 mb-1">目的・商談内容 <span className="text-rose-500">*</span></label><textarea id="purpose" value={purpose} onChange={(e) => setPurpose(e.target.value)} rows="4" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required></textarea></div>
-                                <div className="flex items-center space-x-4 pt-2">
-                                    <button type="submit" className="w-full bg-sky-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-transform transform hover:scale-105 shadow-lg">{editingId ? '更新する' : '登録する'}</button>
-                                    {editingId && (<button type="button" onClick={resetForm} className="w-full bg-slate-200 text-slate-700 font-bold py-3 px-4 rounded-lg hover:bg-slate-300 transition">キャンセル</button>)}
-                                </div>
-                            </form>
-                        </div>
-                        <div className="lg:col-span-2">
-                            <div className="bg-white p-5 rounded-2xl shadow-lg mb-6">
-                                <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-4">
-                                    <h3 className="text-xl font-bold text-slate-800">表示オプション</h3>
-                                    <div className="flex gap-4">
-                                        <button onClick={() => navigateTo('weekly')} className="text-sm font-semibold text-sky-600 hover:text-sky-800 transition">週間表示</button>
-                                        <button onClick={() => navigateTo('past_all')} className="text-sm font-semibold text-sky-600 hover:text-sky-800 transition">チームの過去アポ →</button>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
-                                    <div><label htmlFor="filterDate" className="block text-sm font-medium text-slate-700 mb-1">訪問日</label><input type="date" id="filterDate" value={filterDate} onChange={e => setFilterDate(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition"/></div>
-                                    <div><label htmlFor="filterSalesPerson" className="block text-sm font-medium text-slate-700 mb-1">営業担当</label>
-                                        <select id="filterSalesPerson" value={filterSalesPerson} onChange={e => setFilterSalesPerson(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition bg-white">
-                                            <option value="">すべての担当者</option>
-                                            {allSalespersons.map(person => <option key={person} value={person}>{person}</option>)}
-                                        </select>
-                                    </div>
-                                </div>
-                                {(filterDate || filterSalesPerson) && (
-                                    <button onClick={() => {setFilterDate(''); setFilterSalesPerson('');}} className="mt-4 text-sm bg-slate-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-slate-600 transition">絞り込みをクリア</button>
-                                )}
+                        </header>
+                        <main>
+                            <div className="overflow-x-auto bg-white p-2 rounded-xl shadow-lg">
+                                <table className="w-full border-collapse min-w-[800px]">
+                                    <thead>
+                                        <tr>
+                                            <th className="p-1 border border-slate-200 w-28 sticky left-0 bg-white/75 backdrop-blur-sm text-xs sm:text-sm z-10">担当者</th>
+                                            {weekDays.map(day => (
+                                                <th key={day.toISOString()} className={`p-1 border border-slate-200 text-xs sm:text-sm ${getDateColorClass(day)}`}>
+                                                    {day.toLocaleDateString('ja-JP', { weekday: 'short' })}
+                                                    <span className="block text-sm sm:text-base">{day.getDate()}</span>
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {salesPersonsInWeek.map(person => (
+                                            <tr key={person}>
+                                                <td className="p-1 border border-slate-200 font-bold align-top sticky left-0 bg-white/75 backdrop-blur-sm text-xs sm:text-sm z-10">
+                                                    <button onClick={() => onViewDetails(person)} className="text-sky-600 hover:underline w-full text-left p-1">
+                                                        {person}
+                                                    </button>
+                                                </td>
+                                                {weekDays.map(day => {
+                                                    const dayAppointments = weekAppointments
+                                                        .filter(app => {
+                                                            const appDate = timestampToDate(app.visitStartTimestamp);
+                                                            return app.salesPerson === person && appDate && appDate.toDateString() === day.toDateString()
+                                                        })
+                                                        .sort((a,b) => (timestampToDate(a.visitStartTimestamp)?.getTime() || 0) - (timestampToDate(b.visitStartTimestamp)?.getTime() || 0));
+                                                    return (
+                                                        <td key={day.toISOString()} className="p-1 border border-slate-200 align-top">
+                                                            <div className="space-y-1">
+                                                                {dayAppointments.map(app => (
+                                                                    <div key={app.id} className={`p-1 rounded border-l-4 ${getSalespersonColor(app.salesPerson)}`}>
+                                                                        <p className="font-bold text-[10px]">{formatVisitTime(app.visitStartTimestamp, app.visitEndTimestamp).time}</p>
+                                                                        <p className="font-semibold text-[11px] truncate">{app.customerName}</p>
+                                                                        <p className="text-[10px] opacity-75 truncate">{app.purpose}</p>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                {salesPersonsInWeek.length === 0 && <div className="text-center p-8 text-slate-500">この週のアポイントはありません。</div>}
                             </div>
-                            <div className="space-y-5">
-                                {isLoading ? (<div className="text-center py-10"><p className="text-slate-500">データを読み込み中...</p></div>) : 
-                                filteredAppointments.length === 0 ? (<div className="text-center py-16 bg-white rounded-xl shadow-sm"><p className="text-slate-500">現在のアポイントはありません。</p><p className="text-slate-400 text-sm mt-2">新しいアポイントを登録してください。</p></div>) : 
-                                (filteredAppointments.map(app => (<AppointmentCard key={app.id} app={app} onEdit={handleEdit} onDelete={handleDelete} onViewDetails={(person) => navigateTo('detail', person)} />)))}
-                            </div>
-                        </div>
-                    </main>
-                </div>
-            );
+                        </main>
+                    </div>
+                );
+            };
+            
+            const SalespersonManager = ({ db, teamId, allSalespersons, onClose }) => {
+                const [isDeleting, setIsDeleting] = useState(false);
+                
+                const handleDelete = async (nameToDelete) => {
+                    const confirmation = window.confirm(`本当に「${nameToDelete}」さんを完全削除しますか？\n\nこの担当者が設定されている過去の全てのアポイントから名前が削除されます。\nこの操作は元に戻せません。`);
+                    if (!confirmation) return;
 
-            const handleBack = useCallback(() => {
-                window.history.back();
-            }, []);
+                    const password = window.prompt("削除を実行するには、設定したパスワードを入力してください。\n（注意：このパスワード管理機能は簡易的なものです）");
+                    if (password === null) return;
 
-            // 画面ルーティング
-            return (
-                <div className="bg-slate-50 min-h-screen font-sans text-slate-800">
-                    <ConfirmationModal isOpen={isModalOpen} message={modalMessage} onConfirm={handleConfirmSubmit} onCancel={handleCancelSubmit} />
+                    setIsDeleting(true);
+                    try {
+                        // 注意：クライアントサイドでのパスワード検証は非推奨です。
+                        const securityDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'security');
+                        const securityDoc = await getDoc(securityDocRef);
 
-                    {(() => {
-                        switch (currentView.view) {
-                            case 'detail':
-                                return <DetailPage salesPerson={currentView.data} appointments={appointments} onBack={handleBack} onEdit={handleEdit} onDelete={handleDelete} onViewPast={() => navigateTo('past_personal', currentView.data)} />;
-                            case 'past_all':
-                                return <PastAppointmentsPage appointments={appointments} onBack={handleBack} onEdit={handleEdit} onDelete={handleDelete} title="チームの過去アポイント" />;
-                            case 'past_personal':
-                                return <PastAppointmentsPage appointments={appointments} onBack={handleBack} onEdit={handleEdit} onDelete={handleDelete} title={`${currentView.data}さんの過去アポイント`} filterPerson={currentView.data} />;
-                            case 'weekly':
-                                return <WeeklyPage appointments={appointments} colorMap={colorMap} onBack={handleBack} onViewDetails={(person) => navigateTo('detail', person)} />;
-                            case 'settings':
-                                return <SalespersonManager db={db} teamId={teamId} allSalespersons={allSalespersons} onClose={handleBack} />;
-                            default:
-                                return mainView;
+                        if (!securityDoc.exists() || securityDoc.data().deletePassword !== password) {
+                            alert('パスワードが違うか、設定されていません。');
+                            setIsDeleting(false);
+                            return;
                         }
-                    })()}
-                </div>
-            );
-        }
 
-        // Reactアプリケーションの起動処理
-        const rootElement = document.getElementById('root');
-        if (rootElement) {
-            const root = ReactDOM.createRoot(rootElement);
-            // 開発中の問題を検出しやすくするためにStrictModeを使用
-            root.render(
-                <React.StrictMode>
-                    <App />
-                </React.StrictMode>
-            );
+                        const collectionName = `${teamId}_appointments`;
+                        const appointmentsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
+                        const q = query(appointmentsCollectionRef, where("salesPerson", "==", nameToDelete));
+                        
+                        const querySnapshot = await getDocs(q);
+                        
+                        if (querySnapshot.empty) {
+                            alert(`「${nameToDelete}」さんのアポイントは見つかりませんでした。この名前は過去のアポイントには使用されていないようです。`);
+                            setIsDeleting(false);
+                            return;
+                        }
+
+                        const batch = writeBatch(db);
+                        querySnapshot.forEach((doc) => {
+                            batch.update(doc.ref, { salesPerson: "" });
+                        });
+                        
+                        await batch.commit();
+                        alert(`「${nameToDelete}」さんの名前を関連アポイント（${querySnapshot.size}件）から削除しました。`);
+                    } catch (error) {
+                        console.error("Error deleting salesperson:", error);
+                        alert("削除中にエラーが発生しました。権限設定を確認してください。");
+                    } finally {
+                        setIsDeleting(false);
+                    }
+                };
+
+                return (
+                    <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
+                        <div className="bg-white rounded-xl shadow-2xl p-6 sm:p-8 max-w-md w-full">
+                            <h2 className="text-2xl font-bold text-slate-800 mb-6">担当者 完全削除</h2>
+                            <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                                {allSalespersons.length > 0 ? allSalespersons.map(name => (
+                                    <div key={name} className="flex justify-between items-center bg-slate-100 p-2 rounded-lg">
+                                        <span className="text-slate-800">{name}</span>
+                                        <button onClick={() => handleDelete(name)} disabled={isDeleting} title={`「${name}」さんを完全削除`} className="p-1 text-rose-500 hover:bg-rose-100 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <TrashIcon />
+                                        </button>
+                                    </div>
+                                )) : <p className="text-slate-500 text-center py-4">現在登録されている担当者はいません。</p>}
+                            </div>
+                            {isDeleting && <p className="text-center text-sky-600 mt-4">削除処理を実行中...</p>}
+                            <button onClick={onClose} disabled={isDeleting} className="w-full mt-6 px-4 py-2.5 bg-slate-200 text-slate-800 font-semibold rounded-lg hover:bg-slate-300 transition disabled:opacity-50">閉じる</button>
+                        </div>
+                    </div>
+                );
+            };
+            
+            // メインアプリケーションコンポーネント
+            function App() {
+                const [db, setDb] = useState(null);
+                const [user, setUser] = useState(null);
+                const [isAuthReady, setIsAuthReady] = useState(false);
+                const [teamId, setTeamId] = useState('');
+                const [appointments, setAppointments] = useState([]);
+                const [isLoading, setIsLoading] = useState(true);
+                // エラー状態管理
+                const [error, setError] = useState(null);
+                
+                // フォームの状態
+                const [customerName, setCustomerName] = useState('');
+                const [contactPerson, setContactPerson] = useState('');
+                const [address, setAddress] = useState('');
+                const [visitDate, setVisitDate] = useState('');
+                const [visitStartTime, setVisitStartTime] = useState('');
+                const [visitEndTime, setVisitEndTime] = useState('');
+                const [purpose, setPurpose] = useState('');
+                const [salesPerson, setSalesPerson] = useState('');
+                const [editingId, setEditingId] = useState(null);
+                const formRef = useRef(null);
+                
+                // フィルターの状態
+                const [filterDate, setFilterDate] = useState('');
+                const [filterSalesPerson, setFilterSalesPerson] = useState('');
+                
+                // モーダルの状態
+                const [isModalOpen, setIsModalOpen] = useState(false);
+                const [modalMessage, setModalMessage] = useState('');
+                const [pendingAppointment, setPendingAppointment] = useState(null);
+
+                // 画面遷移の状態
+                const [currentView, setCurrentView] = useState({ view: 'main', data: null });
+                
+                // 担当者と色の管理
+                const [allSalespersons, setAllSalespersons] = useState([]);
+                const [colorMap, setColorMap] = useState({});
+
+                // 使用可能なカラークラスの定義
+                const colorClasses = useMemo(() => [
+                    'bg-sky-50 text-sky-800 border-sky-400',     'bg-emerald-50 text-emerald-800 border-emerald-400',
+                    'bg-amber-50 text-amber-800 border-amber-400', 'bg-rose-50 text-rose-800 border-rose-400',
+                    'bg-indigo-50 text-indigo-800 border-indigo-400','bg-fuchsia-50 text-fuchsia-800 border-fuchsia-400',
+                    'bg-lime-50 text-lime-800 border-lime-400',     'bg-cyan-50 text-cyan-800 border-cyan-400',
+                    'bg-pink-50 text-pink-800 border-pink-400',     'bg-purple-50 text-purple-800 border-purple-400',
+                    'bg-green-50 text-green-800 border-green-400',   'bg-yellow-50 text-yellow-800 border-yellow-400',
+                    'bg-red-50 text-red-800 border-red-400',       'bg-blue-50 text-blue-800 border-blue-400',
+                    'bg-orange-50 text-orange-800 border-orange-400', 'bg-teal-50 text-teal-800 border-teal-400',
+                    'bg-violet-50 text-violet-800 border-violet-400', 'bg-gray-200 text-gray-800 border-gray-400'
+                ], []);
+
+                const navigateTo = useCallback((view, data = null) => {
+                    const newState = { view, data };
+                    // 状態が変更された場合のみ遷移
+                    if (!currentView || currentView.view !== newState.view || JSON.stringify(currentView.data) !== JSON.stringify(newState.data)) {
+                        // 初期ロード時以外はpushState
+                        if (window.history.state !== null) {
+                            window.history.pushState(newState, '');
+                        }
+                        setCurrentView(newState);
+                    }
+                }, [currentView]);
+
+                // ブラウザバック/フォワード対応
+                useEffect(() => {
+                    const handlePopState = (event) => {
+                        setCurrentView(event.state || { view: 'main', data: null });
+                    };
+                    // 初期状態の設定
+                    if (window.history.state === null) {
+                        window.history.replaceState({ view: 'main', data: null }, '');
+                    }
+                    window.addEventListener('popstate', handlePopState);
+                    return () => window.removeEventListener('popstate', handlePopState);
+                }, []);
+
+                // チームIDの復元
+                useEffect(() => {
+                    const savedTeamId = localStorage.getItem('sales-app-team-id');
+                    if (savedTeamId) setTeamId(savedTeamId);
+                }, []);
+
+                // Firebase初期化と認証
+                useEffect(() => {
+                    try {
+                        const app = initializeApp(firebaseConfig);
+                        const authInstance = getAuth(app);
+                        const dbInstance = getFirestore(app);
+                        setDb(dbInstance);
+                        const unsubscribeAuth = onAuthStateChanged(authInstance, async (currentUser) => {
+                            if (!currentUser) {
+                                try {
+                                    // 匿名認証
+                                    await signInAnonymously(authInstance);
+                                } catch (error) {
+                                    console.error("Authentication failed:", error);
+                                    setError("認証に失敗しました。Firebaseで匿名認証が有効か確認してください。");
+                                }
+                            }
+                            setUser(authInstance.currentUser);
+                            setIsAuthReady(true);
+                        });
+                        return () => unsubscribeAuth();
+                    } catch (error) {
+                        console.error("Firebase initialization failed:", error);
+                        setError("アプリの初期化に失敗しました。Firebaseの設定(APIキーなど)が正しいか確認してください。");
+                    }
+                }, []);
+
+                // Firestoreからカラーマップを読み込む
+                useEffect(() => {
+                    if (!isAuthReady || !db || !teamId) return;
+                    
+                    const colorMapRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', `${teamId}_color_map`);
+                    const unsubscribe = onSnapshot(colorMapRef, (docSnap) => {
+                        if (docSnap.exists()) {
+                            setColorMap(docSnap.data() || {});
+                        } else {
+                            setColorMap({});
+                        }
+                    }, (error) => {
+                        console.error("Error fetching color map:", error);
+                        // カラーマップの読み込み失敗は致命的ではないため、エラー表示はしない
+                    });
+                    return () => unsubscribe();
+                }, [isAuthReady, db, teamId]);
+
+                // アポイントメントデータの読み込み
+                useEffect(() => {
+                    if (!isAuthReady || !db || !teamId) return;
+                    setIsLoading(true);
+                    setError(null); // 読み込み開始時にエラーをリセット
+
+                    const collectionName = `${teamId}_appointments`;
+                    const appointmentsCollection = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
+                    // visitStartTimestampでソート
+                    const q = query(appointmentsCollection, orderBy('visitStartTimestamp', 'asc'));
+                    
+                    const unsubscribe = onSnapshot(q, (snapshot) => {
+                        const appointmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        setAppointments(appointmentsData);
+                        const salesPeople = [...new Set(appointmentsData.map(app => app.salesPerson).filter(Boolean))].sort();
+                        setAllSalespersons(salesPeople);
+                        setIsLoading(false);
+                    }, (error) => {
+                        console.error("Error fetching appointments:", error);
+                        setError(`データの読み込みに失敗しました。(Team ID: ${teamId})\nFirestoreのセキュリティルールが正しく設定されているか確認してください。\n詳細: ${error.message}`);
+                        setIsLoading(false);
+                    });
+                    return () => unsubscribe();
+                }, [isAuthReady, db, teamId]);
+
+                // 新しい担当者に色を割り当ててFirestoreに保存する
+                useEffect(() => {
+                    if (!db || !teamId || allSalespersons.length === 0) return;
+
+                    const newPersons = allSalespersons.filter(p => p && !colorMap[p]);
+                    if (newPersons.length > 0) {
+                        const newColorMapUpdates = {};
+                        const usedColors = Object.values(colorMap);
+                        let availableColors = colorClasses.filter(c => !usedColors.includes(c));
+
+                        newPersons.forEach(person => {
+                            if (availableColors.length > 0) {
+                                newColorMapUpdates[person] = availableColors.shift();
+                            } else {
+                                // 空きがなければランダムに割り当てる
+                                newColorMapUpdates[person] = colorClasses[Math.floor(Math.random() * colorClasses.length)];
+                            }
+                        });
+
+                        const colorMapRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', `${teamId}_color_map`);
+                        setDoc(colorMapRef, newColorMapUpdates, { merge: true }).catch(error => console.error("Error updating color map:", error));
+                    }
+                }, [allSalespersons, colorMap, db, teamId, colorClasses]);
+
+                // フィルタリング処理
+                const filteredAppointments = useMemo(() => {
+                    const now = new Date();
+                    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
+                    return appointments.filter(app => {
+                        const appDate = timestampToDate(app.visitStartTimestamp);
+                        if (!appDate) return false;
+                        
+                        const isCurrent = appDate > oneHourAgo;
+                        
+                        // 日付比較（ローカルタイムゾーンでの比較）
+                        const appDateString = `${appDate.getFullYear()}-${('0' + (appDate.getMonth() + 1)).slice(-2)}-${('0' + appDate.getDate()).slice(-2)}`;
+                        const dateMatch = !filterDate || (appDateString === filterDate);
+                        
+                        const personMatch = !filterSalesPerson || app.salesPerson === filterSalesPerson;
+                        return isCurrent && dateMatch && personMatch;
+                    });
+                }, [appointments, filterDate, filterSalesPerson]);
+
+                // --- ハンドラ関数 ---
+
+                const handleTeamIdSubmit = (id) => {
+                    localStorage.setItem('sales-app-team-id', id);
+                    setTeamId(id);
+                };
+
+                const handleChangeTeamId = () => {
+                    if (window.confirm('チームIDを変更しますか？\n（入力中の内容は失われます）')) {
+                        localStorage.removeItem('sales-app-team-id');
+                        setTeamId('');
+                        setAppointments([]);
+                        setColorMap({});
+                        resetForm();
+                        navigateTo('main');
+                        setError(null); // エラーもリセット
+                    }
+                };
+
+                const proceedWithSubmission = async (appointmentData) => {
+                    if (!teamId || !db) return;
+                    try {
+                        const collectionName = `${teamId}_appointments`;
+                        const appointmentsCollection = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
+                        if (editingId) {
+                            const docRef = doc(db, 'artifacts', appId, 'public', 'data', collectionName, editingId);
+                            // 更新時はupdatedAtを設定
+                            await updateDoc(docRef, {
+                                ...appointmentData,
+                                updatedAt: serverTimestamp()
+                            });
+                        } else {
+                            // 新規作成時はcreatedAtを設定
+                            await addDoc(appointmentsCollection, {
+                                ...appointmentData,
+                                createdAt: serverTimestamp()
+                            });
+                        }
+                        resetForm();
+                    } catch (error) { 
+                        console.error("Error saving appointment: ", error); 
+                        alert('アポイントの保存中にエラーが発生しました。権限設定を確認してください。'); 
+                    }
+                };
+
+                const handleSubmit = async (e) => {
+                    e.preventDefault();
+                    
+                    // 担当者名の前後の空白を削除
+                    const trimmedSalesPerson = salesPerson.trim();
+
+                    if (!customerName || !visitDate || !visitStartTime || !purpose || !trimmedSalesPerson) {
+                        alert('必須項目（お名前、訪問日、開始時間、目的、営業担当）を入力してください。');
+                        return;
+                    }
+                    
+                    const startTime = new Date(`${visitDate}T${visitStartTime}`);
+                    const endTime = visitEndTime ? new Date(`${visitDate}T${visitEndTime}`) : null;
+
+                    // 終了時刻が開始時刻より前の場合はエラーとする
+                    if (endTime && startTime >= endTime) {
+                        alert('終了時間は開始時間より後に設定してください。');
+                        return;
+                    }
+
+                    const newStartTimestamp = Timestamp.fromDate(startTime);
+                    const newEndTimestamp = endTime ? Timestamp.fromDate(endTime) : null;
+
+                    // 重複チェック
+                    const conflictingAppointment = appointments.find(app => {
+                        if (editingId && app.id === editingId) return false;
+                        if (app.salesPerson !== trimmedSalesPerson) return false;
+                        
+                        const existingStart = timestampToDate(app.visitStartTimestamp);
+                        if (!existingStart) return false;
+
+                        // 終了時刻がない場合は1時間とみなして重複チェックを行う
+                        const existingEnd = timestampToDate(app.visitEndTimestamp) || new Date(existingStart.getTime() + 60 * 60 * 1000);
+                        
+                        const newStart = startTime;
+                        const newEnd = endTime || new Date(startTime.getTime() + 60 * 60 * 1000);
+
+                        // (StartA < EndB) and (EndA > StartB)
+                        return newStart < existingEnd && newEnd > existingStart;
+                    });
+
+                    const appointmentData = { 
+                        customerName, 
+                        contactPerson, 
+                        address, 
+                        visitStartTimestamp: newStartTimestamp, 
+                        visitEndTimestamp: newEndTimestamp, 
+                        purpose, 
+                        salesPerson: trimmedSalesPerson, 
+                        authorId: user?.uid
+                    };
+
+                    if (conflictingAppointment) {
+                        const { date, time } = formatVisitTime(conflictingAppointment.visitStartTimestamp, conflictingAppointment.visitEndTimestamp);
+                        const message = `警告：${trimmedSalesPerson}さんには、指定した時間と重複する別のアポイントが登録されています。\n\n` + `重複アポ: ${conflictingAppointment.customerName} 様\n` + `日時: ${date} ${time}`;
+                        setModalMessage(message);
+                        setPendingAppointment(appointmentData);
+                        setIsModalOpen(true);
+                    } else {
+                        await proceedWithSubmission(appointmentData);
+                    }
+                };
+
+                const handleConfirmSubmit = async () => {
+                    if (pendingAppointment) await proceedWithSubmission(pendingAppointment);
+                    setIsModalOpen(false);
+                    setPendingAppointment(null);
+                };
+
+                const handleCancelSubmit = () => {
+                    setIsModalOpen(false);
+                    setPendingAppointment(null);
+                };
+
+                const handleEdit = (appointment) => {
+                    const toDateInputFormat = (date) => {
+                        const year = date.getFullYear();
+                        const month = ('0' + (date.getMonth() + 1)).slice(-2);
+                        const day = ('0' + date.getDate()).slice(-2);
+                        return `${year}-${month}-${day}`;
+                    };
+                    const toTimeInputFormat = (date) => `${('0'+date.getHours()).slice(-2)}:${('0'+date.getMinutes()).slice(-2)}`;
+
+                    // メイン画面に戻る
+                    if (currentView.view !== 'main') {
+                        navigateTo('main');
+                    }
+
+                    // 画面遷移後にフォームを設定するためにsetTimeoutを使用
+                    setTimeout(() => {
+                        setEditingId(appointment.id);
+                        setCustomerName(appointment.customerName);
+                        setContactPerson(appointment.contactPerson || '');
+                        setAddress(appointment.address || '');
+                        
+                        const startDate = timestampToDate(appointment.visitStartTimestamp);
+                        if (startDate) {
+                            setVisitDate(toDateInputFormat(startDate));
+                            setVisitStartTime(toTimeInputFormat(startDate));
+                        } else {
+                            setVisitDate('');
+                            setVisitStartTime('');
+                        }
+                        
+                        const endDate = timestampToDate(appointment.visitEndTimestamp);
+                        setVisitEndTime(endDate ? toTimeInputFormat(endDate) : '');
+                        
+                        setPurpose(appointment.purpose);
+                        setSalesPerson(appointment.salesPerson || '');
+                        
+                        // フォームまでスクロール
+                        if (formRef.current) {
+                            formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    }, 100); // 画面遷移を考慮して少し待つ
+                };
+
+                const handleDelete = async (id) => {
+                    if (window.confirm('このアポイントを削除してもよろしいですか？')) {
+                        if (!db || !teamId) return;
+                        try {
+                            const collectionName = `${teamId}_appointments`;
+                            const docRef = doc(db, 'artifacts', appId, 'public', 'data', collectionName, id);
+                            await deleteDoc(docRef);
+                            // 削除したものが編集中のものだった場合、フォームをリセット
+                            if (editingId === id) {
+                                resetForm();
+                            }
+                        } catch (error) { 
+                            console.error("Error deleting appointment: ", error); 
+                            alert('アポイントの削除中にエラーが発生しました。権限設定を確認してください。'); 
+                        }
+                    }
+                };
+
+                const resetForm = () => {
+                    setCustomerName(''); setContactPerson(''); setAddress('');
+                    setVisitDate(''); setVisitStartTime(''); setVisitEndTime('');
+                    setPurpose(''); setSalesPerson(''); setEditingId(null);
+                };
+
+                // --- レンダリング制御 ---
+
+                // エラー画面の表示
+                if (error && (!isAuthReady || !teamId)) {
+                    // 初期化・認証・TeamID入力前のエラー
+                    return (
+                        <div className="min-h-screen flex items-center justify-center bg-rose-50 p-4">
+                            <div className="bg-white p-8 rounded-xl shadow-xl border border-rose-200 max-w-lg w-full">
+                                <h1 className="text-2xl font-bold text-rose-700 mb-4">アプリケーションエラー</h1>
+                                <p className="text-slate-700 mb-6 whitespace-pre-wrap">{error}</p>
+                                <button onClick={() => window.location.reload()} className="w-full bg-sky-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-700 transition">再読み込み</button>
+                            </div>
+                        </div>
+                    );
+                }
+
+                // ローディングとチームID入力画面の制御
+                if (!isAuthReady) return <div className="flex justify-center items-center h-screen text-slate-500">認証中...</div>;
+                if (!teamId) return <TeamIdEntry onTeamIdSubmit={handleTeamIdSubmit} />;
+
+                // データ読み込みエラー（TeamID設定後）
+                if (error) {
+                        return (
+                        <div className="min-h-screen flex items-center justify-center bg-rose-50 p-4">
+                            <div className="bg-white p-8 rounded-xl shadow-xl border border-rose-200 max-w-lg w-full">
+                                <h1 className="text-2xl font-bold text-rose-700 mb-4">データ読み込みエラー</h1>
+                                <p className="text-slate-700 mb-6 whitespace-pre-wrap">{error}</p>
+                                <div className="flex space-x-4">
+                                    <button onClick={handleChangeTeamId} className="w-full bg-slate-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-slate-600 transition">チームIDを変更</button>
+                                    <button onClick={() => window.location.reload()} className="w-full bg-sky-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-700 transition">再試行</button>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                }
+
+
+                // メイン画面の定義
+                const mainView = (
+                    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+                        <header className="text-center mb-10 relative">
+                            <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-800">アポイント共有</h1>
+                            <p className="text-slate-500 mt-2">チームID: <span className="font-semibold text-sky-600">{teamId}</span></p>
+                            <button onClick={handleChangeTeamId} className="absolute top-0 right-0 text-xs text-slate-500 hover:text-sky-600 underline">ID変更</button>
+                        </header>
+                        {/* フォーム部分をstickyにして操作性を向上 */}
+                        <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            <div ref={formRef} className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-lg h-fit lg:sticky lg:top-6">
+                                <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
+                                    <h2 className="text-2xl font-bold">{editingId ? 'アポイント編集' : '新規登録'}</h2>
+                                    <button onClick={() => navigateTo('settings')} title="担当者管理・設定" className="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition">
+                                        <CogIcon />
+                                    </button>
+                                </div>
+                                <form onSubmit={handleSubmit} className="space-y-5">
+                                    <div><label htmlFor="customerName" className="block text-sm font-semibold text-slate-700 mb-1">お名前 <span className="text-rose-500">*</span></label><input type="text" id="customerName" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required /></div>
+                                    <div><label htmlFor="address" className="block text-sm font-semibold text-slate-700 mb-1">住所</label><input type="text" id="address" value={address} onChange={(e) => setAddress(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" /></div>
+                                    <div><label htmlFor="contactPerson" className="block text-sm font-semibold text-slate-700 mb-1">その他連絡先など</label><input type="text" id="contactPerson" value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" /></div>
+                                    <div><label htmlFor="visitDate" className="block text-sm font-semibold text-slate-700 mb-1">訪問日 <span className="text-rose-500">*</span></label><input type="date" id="visitDate" value={visitDate} onChange={(e) => setVisitDate(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required /></div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div><label htmlFor="visitStartTime" className="block text-sm font-semibold text-slate-700 mb-1">開始時間 <span className="text-rose-500">*</span></label><input type="time" id="visitStartTime" value={visitStartTime} onChange={(e) => setVisitStartTime(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required /></div>
+                                        <div><label htmlFor="visitEndTime" className="block text-sm font-semibold text-slate-700 mb-1">終了時間</label><input type="time" id="visitEndTime" value={visitEndTime} onChange={(e) => setVisitEndTime(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" /></div>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="salesPerson" className="block text-sm font-semibold text-slate-700 mb-1">営業担当 <span className="text-rose-500">*</span></label>
+                                        {/* 入力値はそのまま保持し、送信時にtrimする */}
+                                        <input type="text" list="salespersons-list" id="salesPerson" value={salesPerson} onChange={(e) => setSalesPerson(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required />
+                                        <datalist id="salespersons-list">
+                                            {allSalespersons.map(person => <option key={person} value={person} />)}
+                                        </datalist>
+                                    </div>
+                                    <div><label htmlFor="purpose" className="block text-sm font-semibold text-slate-700 mb-1">目的・商談内容 <span className="text-rose-500">*</span></label><textarea id="purpose" value={purpose} onChange={(e) => setPurpose(e.target.value)} rows="4" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required></textarea></div>
+                                    <div className="flex items-center space-x-4 pt-2">
+                                        <button type="submit" className="w-full bg-sky-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-transform transform hover:scale-105 shadow-lg">{editingId ? '更新する' : '登録する'}</button>
+                                        {editingId && (<button type="button" onClick={resetForm} className="w-full bg-slate-200 text-slate-700 font-bold py-3 px-4 rounded-lg hover:bg-slate-300 transition">キャンセル</button>)}
+                                    </div>
+                                </form>
+                            </div>
+                            <div className="lg:col-span-2">
+                                <div className="bg-white p-5 rounded-2xl shadow-lg mb-6">
+                                    <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-4">
+                                        <h3 className="text-xl font-bold text-slate-800">表示オプション</h3>
+                                        <div className="flex gap-4">
+                                            <button onClick={() => navigateTo('weekly')} className="text-sm font-semibold text-sky-600 hover:text-sky-800 transition">週間表示</button>
+                                            <button onClick={() => navigateTo('past_all')} className="text-sm font-semibold text-sky-600 hover:text-sky-800 transition">チームの過去アポ →</button>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+                                        <div><label htmlFor="filterDate" className="block text-sm font-medium text-slate-700 mb-1">訪問日</label><input type="date" id="filterDate" value={filterDate} onChange={e => setFilterDate(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition"/></div>
+                                        <div><label htmlFor="filterSalesPerson" className="block text-sm font-medium text-slate-700 mb-1">営業担当</label>
+                                            <select id="filterSalesPerson" value={filterSalesPerson} onChange={e => setFilterSalesPerson(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition bg-white">
+                                                <option value="">すべての担当者</option>
+                                                {allSalespersons.map(person => <option key={person} value={person}>{person}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    {(filterDate || filterSalesPerson) && (
+                                        <button onClick={() => {setFilterDate(''); setFilterSalesPerson('');}} className="mt-4 text-sm bg-slate-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-slate-600 transition">絞り込みをクリア</button>
+                                    )}
+                                </div>
+                                <div className="space-y-5">
+                                    {isLoading ? (<div className="text-center py-10"><p className="text-slate-500">データを読み込み中...</p></div>) : 
+                                    filteredAppointments.length === 0 ? (<div className="text-center py-16 bg-white rounded-xl shadow-sm"><p className="text-slate-500">現在のアポイントはありません。</p><p className="text-slate-400 text-sm mt-2">新しいアポイントを登録してください。</p></div>) : 
+                                    (filteredAppointments.map(app => (<AppointmentCard key={app.id} app={app} onEdit={handleEdit} onDelete={handleDelete} onViewDetails={(person) => navigateTo('detail', person)} />)))}
+                                </div>
+                            </div>
+                        </main>
+                    </div>
+                );
+
+                const handleBack = useCallback(() => {
+                    window.history.back();
+                }, []);
+
+                // 画面ルーティング
+                return (
+                    <div className="bg-slate-50 min-h-screen font-sans text-slate-800">
+                        <ConfirmationModal isOpen={isModalOpen} message={modalMessage} onConfirm={handleConfirmSubmit} onCancel={handleCancelSubmit} />
+
+                        {(() => {
+                            switch (currentView.view) {
+                                case 'detail':
+                                    return <DetailPage salesPerson={currentView.data} appointments={appointments} onBack={handleBack} onEdit={handleEdit} onDelete={handleDelete} onViewPast={() => navigateTo('past_personal', currentView.data)} />;
+                                case 'past_all':
+                                    return <PastAppointmentsPage appointments={appointments} onBack={handleBack} onEdit={handleEdit} onDelete={handleDelete} title="チームの過去アポイント" />;
+                                case 'past_personal':
+                                    return <PastAppointmentsPage appointments={appointments} onBack={handleBack} onEdit={handleEdit} onDelete={handleDelete} title={`${currentView.data}さんの過去アポイント`} filterPerson={currentView.data} />;
+                                case 'weekly':
+                                    return <WeeklyPage appointments={appointments} colorMap={colorMap} onBack={handleBack} onViewDetails={(person) => navigateTo('detail', person)} />;
+                                case 'settings':
+                                    return <SalespersonManager db={db} teamId={teamId} allSalespersons={allSalespersons} onClose={handleBack} />;
+                                default:
+                                    return mainView;
+                            }
+                        })()}
+                    </div>
+                );
+            }
+
+            // Reactアプリケーションのレンダリング実行
+            const rootElement = document.getElementById('root');
+            if (rootElement) {
+                const root = ReactDOM.createRoot(rootElement);
+                // 開発中の問題を検出しやすくするためにStrictModeを使用
+                root.render(
+                    <React.StrictMode>
+                        <App />
+                    </React.StrictMode>
+                );
+            } else {
+                console.error("Root element not found");
+            }
+        } // end of startApplication
+
+        // 【修正】実行制御ロジック
+        // Firebaseの準備完了を待ってアプリケーションを起動する
+        if (window.isFirebaseReady) {
+            // すでに準備完了している場合（Firebaseスクリプトが先に実行された）
+            startApplication();
         } else {
-            console.error("Root element not found");
+            // まだ準備が完了していない場合（Reactスクリプトが先に実行された）
+            console.log("Waiting for Firebase SDK...");
+            // ローディング表示を設定
+            const rootElement = document.getElementById('root');
+            if (rootElement && !rootElement.hasChildNodes()) {
+                 // Tailwind CSSのクラスを使ってローディング表示
+                 rootElement.innerHTML = '<div class="flex justify-center items-center h-screen text-slate-500">アプリを準備中...</div>';
+            }
+            // イベントリスナーを登録して待機する
+            window.addEventListener('FirebaseReady', startApplication, { once: true });
         }
 
     </script>
 </body>
 </html>
-```
