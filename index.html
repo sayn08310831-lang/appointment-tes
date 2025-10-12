@@ -36,36 +36,39 @@
     <style>
         body { font-family: 'Noto Sans JP', sans-serif; }
     </style>
-    <!-- 依存ライブラリの読み込み (診断ログを追加) -->
+
     <script>console.log("[診断ログ1] 依存ライブラリ(React/Babel) 読み込み開始");</script>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/japanese-holidays@1.0.10/lib/japanese-holidays.min.js"></script>
-    <script>console.log("[診断ログ2] 依存ライブラリ(React/Babel) 読み込み完了");</script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" defer></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" defer></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/japanese-holidays@1.0.10/lib/japanese-holidays.min.js" defer></script>
+    <script>
+        // DOMContentLoadedイベントは、deferスクリプトの実行完了後に発生します。
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log("[診断ログ2] 依存ライブラリ(React/Babel) 読み込み・実行完了（DOMContentLoaded）");
+        });
+    </script>
 </head>
 <body>
     <div id="root">
-        <!-- 初期ローディング表示（スクリプトが正常に動作すれば上書きされます） -->
         <div style="display: flex; justify-content: center; align-items: center; height: 100vh; color: #94a3b8;">
             読み込み中...
         </div>
     </div>
 
-    <!-- 
-        ステップ1: Firebase SDKの読み込みと準備 (Moduleとして実行)
-    -->
     <script type="module">
         console.log("[診断ログ3] Firebase SDK (Module) 読み込み開始");
-        
-        // 【修正Ver.4】互換性のため、Ver.3で導入したトップレベルawaitとtry/catchを削除し、安定した個別のimport文に戻す
+
+        // Firebase SDK v11.6.1 をモジュールとしてインポート
+        // 注意: 静的インポートが失敗した場合（ネットワークエラーなど）、このスクリプト全体の実行が停止します。
+        // その場合、window.isFirebaseReadyは設定されず、React側のタイムアウト処理が動作します。
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, Timestamp, writeBatch, where, getDoc, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         console.log("[診断ログ4] Firebase SDK インポート定義完了");
 
-        // Reactアプリからアクセスできるようにグローバルスコープ(window)に公開
+        // Reactアプリ(Babelスクリプト)からアクセスできるようにグローバルスコープ(window)に公開
         window.Firebase = {
             initializeApp,
             getAuth, signInAnonymously, onAuthStateChanged,
@@ -80,10 +83,6 @@
         window.dispatchEvent(new CustomEvent('FirebaseReady'));
     </script>
 
-    <!-- 
-        ステップ2: Reactアプリケーション本体 (Babelで実行)
-        Firebaseの準備完了を待ってからアプリを起動する。
-    -->
     <script type="text/babel">
         console.log("[診断ログ6] Reactアプリスクリプト(Babel) 実行開始");
 
@@ -91,9 +90,15 @@
         function startApplication() {
             console.log("[診断ログ7] アプリケーション起動処理(startApplication)を開始します。");
 
-            // 必須ライブラリが利用可能か最終チェック
-            if (!window.Firebase || !window.React || !window.ReactDOM || !window.Firebase.initializeApp) {
-                console.error("[診断ログ エラーB] 必須ライブラリがロードされていません。", {Firebase: !!window.Firebase, React: !!window.React, ReactDOM: !!window.ReactDOM, FirebaseInit: window.Firebase ? !!window.Firebase.initializeApp : false});
+            // 必須ライブラリが利用可能か最終チェック (japaneseHolidaysも追加)
+            if (!window.Firebase || !window.React || !window.ReactDOM || !window.Firebase.initializeApp || !window.japaneseHolidays) {
+                console.error("[診断ログ エラーB] 必須ライブラリがロードされていません。", {
+                    Firebase: !!window.Firebase,
+                    React: !!window.React,
+                    ReactDOM: !!window.ReactDOM,
+                    FirebaseInit: window.Firebase ? !!window.Firebase.initializeApp : false,
+                    JapaneseHolidays: !!window.japaneseHolidays
+                });
                 const root = document.getElementById('root');
                 if (root) {
                      root.innerHTML = '<div style="padding: 20px; color: red;">エラー：アプリケーションの起動に失敗しました。(必須ライブラリのロード失敗)</div>';
@@ -105,18 +110,12 @@
             const { initializeApp } = window.Firebase;
             const { getAuth, signInAnonymously, onAuthStateChanged } = window.Firebase;
             const { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, Timestamp, writeBatch, where, getDoc, getDocs, setDoc } = window.Firebase;
-            
+
+            // Reactの主要な機能（Hooks）を取得
             const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-            // --- SVG Icons ---
-            const UserIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>;
-            const LocationIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>;
-            const BackIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" /></svg>;
-            const CalendarPlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm1 8a1 1 0 100-2h4a1 1 0 100 2H7z" clipRule="evenodd" /><path d="M13 14h-2v-2a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2z" /></svg>;
-            const InfoIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>;
-            const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clipRule="evenodd" /></svg>;
-            const CogIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.982.502 2.222-.098 3.142-.58.9-1.589 1.555-1.589 2.622s1.01 1.722 1.589 2.622c.6.92.638 2.16.098 3.142-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.286.948c.38 1.56 2.6 1.56 2.98 0a1.532 1.532 0 012.286-.948c1.372.836 2.942-.734 2.106-2.106a1.532 1.532 0 01-.098-3.142c.58-.9 1.589-1.555 1.589-2.622s-1.01-1.722-1.589-2.622a1.532 1.532 0 01.098-3.142c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.286-.948zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>;
-
+            // --- Firebase接続設定 ---
+            // ※重要※ この設定はあなたのFirebaseプロジェクトの設定である必要があります。
             const firebaseConfig = {
                 apiKey: "AIzaSyCqT_s4-XtGBkrX590DfYRQWPEdl-kE5-0",
                 authDomain: "apointo-a72bc.firebaseapp.com",
@@ -126,11 +125,22 @@
                 appId: "1:1014142886306:web:c97de02bb5f18b8af652fb",
                 measurementId: "G-XWDNVF3W7V"
             };
+            // アプリケーションID（Firestoreのパスに使用）
             const appId = 'default-app-id';
+
+            // --- SVG Icons 定義 ---
+            const UserIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>;
+            const LocationIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>;
+            const BackIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" /></svg>;
+            const CalendarPlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm1 8a1 1 0 100-2h4a1 1 0 100 2H7z" clipRule="evenodd" /><path d="M13 14h-2v-2a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2z" /></svg>;
+            const InfoIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>;
+            const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clipRule="evenodd" /></svg>;
+            const CogIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.982.502 2.222-.098 3.142-.58.9-1.589 1.555-1.589 2.622s1.01 1.722 1.589 2.622c.6.92.638 2.16.098 3.142-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.286.948c.38 1.56 2.6 1.56 2.98 0a1.532 1.532 0 012.286-.948c1.372.836 2.942-.734 2.106-2.106a1.532 1.532 0 01-.098-3.142c.58-.9 1.589-1.555 1.589-2.622s-1.01-1.722-1.589-2.622a1.532 1.532 0 01.098-3.142c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.286-.948zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>;
+
 
             // --- ユーティリティ関数 ---
 
-            // Timestampを安全にDateオブジェクトに変換する関数
+            // FirestoreのTimestampをJavaScriptのDateオブジェクトに安全に変換する関数
             const timestampToDate = (timestamp) => {
                 if (timestamp && typeof timestamp.toDate === 'function') {
                     try {
@@ -147,6 +157,7 @@
                 return null;
             };
 
+            // 訪問日時をフォーマットする関数
             const formatVisitTime = (startTimestamp, endTimestamp) => {
                 const startDate = timestampToDate(startTimestamp);
                 if (!startDate) return { date: '日時未設定', time: '' };
@@ -164,19 +175,20 @@
                 return { date: dateStr, time: startTimeStr };
             };
 
+            // Googleカレンダーへの予定追加リンクを生成する関数
             const generateGoogleCalendarLink = (app) => {
                 const startDate = timestampToDate(app.visitStartTimestamp);
                 if (!startDate) return '#';
 
                 const title = `${app.customerName} 様とのアポイント`;
-                
+
                 let endDate = timestampToDate(app.visitEndTimestamp);
                 if (!endDate) {
                     // 終了時間未設定時は1時間後と仮定
                     endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
                 }
 
-                // ローカルタイムでフォーマット
+                // Googleカレンダー用の日時フォーマット (YYYYMMDDTHHmmss) - ローカルタイム
                 const toLocalFormat = (date) => {
                     const YYYY = date.getFullYear();
                     const MM = ('0' + (date.getMonth() + 1)).slice(-2);
@@ -189,35 +201,39 @@
                 const dates = `${toLocalFormat(startDate)}/${toLocalFormat(endDate)}`;
                 const details = `目的: ${app.purpose}\n担当: ${app.salesPerson || '未設定'}\n連絡先: ${app.contactPerson || '未入力'}`;
                 const location = app.address || '';
+
+                // URLを構築
                 const url = new URL('https://www.google.com/calendar/render');
                 url.searchParams.append('action', 'TEMPLATE');
                 url.searchParams.append('text', title);
                 url.searchParams.append('dates', dates);
                 url.searchParams.append('details', details);
                 url.searchParams.append('location', location);
-                // タイムゾーンを指定
+                // タイムゾーンを指定（重要）
                 url.searchParams.append('ctz', 'Asia/Tokyo');
                 return url.toString();
             };
 
+            // 日付の色（平日、土曜、日曜・祝日）を判定する関数
             const getDateColorClass = (date) => {
                 if (!date) return 'text-slate-800';
                 try {
-                    // 祝日判定
-                    if (window.japaneseHolidays && typeof window.japaneseHolidays.isHoliday === 'function' && window.japaneseHolidays.isHoliday(date)) {
-                        return 'text-rose-600';
+                    // 祝日判定 (japanese-holidaysライブラリを使用。存在は初期化時に確認済み)
+                    if (typeof window.japaneseHolidays.isHoliday === 'function' && window.japaneseHolidays.isHoliday(date)) {
+                        return 'text-rose-600'; // 祝日（赤）
                     }
                 } catch (e) {
                     console.warn("祝日判定エラー", e);
                 }
                 const day = date.getDay();
-                if (day === 0) return 'text-rose-600'; // 日曜
-                if (day === 6) return 'text-sky-600'; // 土曜
-                return 'text-slate-800'; // 平日
+                if (day === 0) return 'text-rose-600'; // 日曜（赤）
+                if (day === 6) return 'text-sky-600'; // 土曜（青）
+                return 'text-slate-800'; // 平日（黒）
             };
 
             // --- コンポーネント定義 ---
-            
+
+            // 確認モーダルコンポーネント（重複登録時などに表示）
             const ConfirmationModal = ({ isOpen, message, onConfirm, onCancel }) => {
                 if (!isOpen) return null;
                 return (
@@ -234,6 +250,7 @@
                 );
             };
 
+            // チームID入力画面コンポーネント（初回アクセス時）
             const TeamIdEntry = ({ onTeamIdSubmit }) => {
                 const [inputTeamId, setInputTeamId] = useState('');
                 const handleSubmit = (e) => {
@@ -255,14 +272,16 @@
                 );
             };
 
+            // アポイントメントカードコンポーネント（一覧表示の各項目）
             const AppointmentCard = ({ app, onEdit, onDelete, onViewDetails, isDetailPage = false, isPast = false }) => {
                 const { date, time } = formatVisitTime(app.visitStartTimestamp, app.visitEndTimestamp);
-                
+
                 const startDate = timestampToDate(app.visitStartTimestamp);
                 const dateColorClass = getDateColorClass(startDate);
-                
+
+                // Googleカレンダー追加ボタンの処理
                 const handleAddToCalendar = (e) => {
-                    e.stopPropagation();
+                    e.stopPropagation(); // カードの他のクリックイベントを妨げないようにする
                     const url = generateGoogleCalendarLink(app);
                     if (url !== '#') {
                         window.open(url, '_blank', 'noopener,noreferrer');
@@ -271,6 +290,7 @@
                     }
                 };
 
+                // 表示制御ロジック
                 const showDetailsButton = !isDetailPage && !isPast;
                 const showSalesPerson = !isDetailPage || isPast;
 
@@ -278,6 +298,7 @@
                     <div className={`bg-white border border-slate-200 p-5 rounded-xl shadow-sm transition-shadow duration-300 ${!isPast && 'hover:shadow-lg'}`}>
                         <div className="flex justify-between items-start">
                             <div>
+                                {/* 日付表示（詳細ページでは非表示、過去ページでは表示） */}
                                 {(!isDetailPage || isPast) && <p className={`font-semibold ${isPast ? dateColorClass.replace('slate-800', 'slate-500').replace('sky-600', 'sky-500').replace('rose-600', 'rose-500') : dateColorClass}`}>{date}</p>}
                                 <p className={`text-2xl font-bold mt-1 ${isPast ? 'text-slate-500' : 'text-slate-800'}`}>{time}</p>
                             </div>
@@ -303,10 +324,13 @@
                 );
             };
 
+            // 詳細ページ（担当者別アポイント一覧）コンポーネント
             const DetailPage = ({ salesPerson, appointments, onBack, onEdit, onDelete, onViewPast }) => {
                 const now = new Date();
+                // 現在時刻の1時間前以降のアポイントを「今後の予定」とする
                 const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-                
+
+                // 担当者が一致し、今後の予定であるアポイントを抽出・ソート
                 const personAppointments = appointments
                     .filter(app => {
                         const appDate = timestampToDate(app.visitStartTimestamp);
@@ -314,13 +338,14 @@
                     })
                     .sort((a, b) => (timestampToDate(a.visitStartTimestamp)?.getTime() || 0) - (timestampToDate(b.visitStartTimestamp)?.getTime() || 0));
 
+                // 日付ごとにグループ化
                 const groupedAppointments = personAppointments.reduce((acc, app) => {
                     const jsDate = timestampToDate(app.visitStartTimestamp);
                     if (!jsDate) return acc;
 
-                    // ローカルタイムで日付キーを生成
+                    // ローカルタイムで日付キーを生成 (YYYY-MM-DD)
                     const dateKey = `${jsDate.getFullYear()}-${('0' + (jsDate.getMonth() + 1)).slice(-2)}-${('0' + jsDate.getDate()).slice(-2)}`;
-                    
+
                     if (!acc[dateKey]) acc[dateKey] = [];
                     acc[dateKey].push(app);
                     return acc;
@@ -379,11 +404,13 @@
                     </div>
                 );
             };
-            
+
+            // 過去のアポイント一覧ページコンポーネント
             const PastAppointmentsPage = ({ appointments, onBack, onEdit, onDelete, title, filterPerson = null }) => {
                 const now = new Date();
                 const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
 
+                // 過去のアポイントを抽出・降順ソート
                 const pastAppointments = appointments
                     .filter(app => {
                         const appDate = timestampToDate(app.visitStartTimestamp);
@@ -392,7 +419,7 @@
                         const personMatch = !filterPerson || app.salesPerson === filterPerson;
                         return isPast && personMatch;
                     })
-                    // 降順ソート
+                    // 降順ソート（新しいものが上）
                     .sort((a, b) => (timestampToDate(b.visitStartTimestamp)?.getTime() || 0) - (timestampToDate(a.visitStartTimestamp)?.getTime() || 0));
 
                 return (
@@ -422,26 +449,30 @@
                 );
             };
 
+            // 週間表示ページコンポーネント
             const WeeklyPage = ({ appointments, colorMap, onBack, onViewDetails }) => {
+                // 週の開始日（火曜日始まり）を計算
                 const [currentWeekStart, setCurrentWeekStart] = useState(() => {
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
                     const dayOfWeek = today.getDay();
-                    // 火曜日始まりの設定
+                    // 火曜日(2)からの経過日数を計算
                     const daysSinceTuesday = (dayOfWeek + 7 - 2) % 7;
-                    
+
                     const tuesday = new Date(today);
                     tuesday.setDate(today.getDate() - daysSinceTuesday);
                     return tuesday;
                 });
-                
+
                 const DEFAULT_COLOR = 'bg-gray-200 text-gray-800 border-gray-400';
 
+                // 担当者の色を取得する関数
                 const getSalespersonColor = useCallback((name) => {
                     if (!name) return DEFAULT_COLOR;
                     return (colorMap && colorMap[name]) || DEFAULT_COLOR;
                 }, [colorMap]);
 
+                // 前の週へ移動
                 const handlePrevWeek = () => {
                     setCurrentWeekStart(prev => {
                         const newDate = new Date(prev);
@@ -450,6 +481,7 @@
                     });
                 };
 
+                // 次の週へ移動
                 const handleNextWeek = () => {
                     setCurrentWeekStart(prev => {
                         const newDate = new Date(prev);
@@ -458,20 +490,23 @@
                     });
                 };
 
+                // 週の日付配列を生成
                 const weekDays = Array.from({ length: 7 }).map((_, i) => {
                     const date = new Date(currentWeekStart);
                     date.setDate(date.getDate() + i);
                     return date;
                 });
-                
+
                 const weekEnd = new Date(weekDays[6]);
                 weekEnd.setHours(23, 59, 59, 999);
 
+                // 週内のアポイントを抽出
                 const weekAppointments = appointments.filter(app => {
                     const appDate = timestampToDate(app.visitStartTimestamp);
                     return appDate && appDate >= currentWeekStart && appDate <= weekEnd;
                 });
-                
+
+                // 週内に登場する担当者リストを生成
                 const salesPersonsInWeek = [...new Set(weekAppointments.map(app => app.salesPerson).filter(Boolean))].sort();
 
                 return (
@@ -494,10 +529,12 @@
                             </div>
                         </header>
                         <main>
+                            {/* 横スクロール可能なテーブル */}
                             <div className="overflow-x-auto bg-white p-2 rounded-xl shadow-lg">
                                 <table className="w-full border-collapse min-w-[800px]">
                                     <thead>
                                         <tr>
+                                            {/* 担当者列（左端に固定） */}
                                             <th className="p-1 border border-slate-200 w-28 sticky left-0 bg-white/75 backdrop-blur-sm text-xs sm:text-sm z-10">担当者</th>
                                             {weekDays.map(day => (
                                                 <th key={day.toISOString()} className={`p-1 border border-slate-200 text-xs sm:text-sm ${getDateColorClass(day)}`}>
@@ -510,12 +547,14 @@
                                     <tbody>
                                         {salesPersonsInWeek.map(person => (
                                             <tr key={person}>
+                                                {/* 担当者名（左端に固定） */}
                                                 <td className="p-1 border border-slate-200 font-bold align-top sticky left-0 bg-white/75 backdrop-blur-sm text-xs sm:text-sm z-10">
                                                     <button onClick={() => onViewDetails(person)} className="text-sky-600 hover:underline w-full text-left p-1">
                                                         {person}
                                                     </button>
                                                 </td>
                                                 {weekDays.map(day => {
+                                                    // 該当日の担当者のアポイントを抽出・ソート
                                                     const dayAppointments = weekAppointments
                                                         .filter(app => {
                                                             const appDate = timestampToDate(app.visitStartTimestamp);
@@ -546,51 +585,67 @@
                     </div>
                 );
             };
-            
+
+            // 担当者管理（完全削除）コンポーネント
+            // 注意：この機能は簡易的なパスワード認証を使用しており、セキュリティは高くありません。
             const SalespersonManager = ({ db, teamId, allSalespersons, onClose }) => {
                 const [isDeleting, setIsDeleting] = useState(false);
-                
+
                 const handleDelete = async (nameToDelete) => {
                     const confirmation = window.confirm(`本当に「${nameToDelete}」さんを完全削除しますか？\n\nこの担当者が設定されている過去の全てのアポイントから名前が削除されます。\nこの操作は元に戻せません。`);
                     if (!confirmation) return;
 
+                    // パスワード入力
                     const password = window.prompt("削除を実行するには、設定したパスワードを入力してください。\n（注意：このパスワード管理機能は簡易的なものです）");
                     if (password === null) return;
 
                     setIsDeleting(true);
                     try {
-                        // 注意：クライアントサイドでのパスワード検証は非推奨です。
+                        // パスワード検証（Firestoreの特定のドキュメントと比較）
                         const securityDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'security');
-                        const securityDoc = await getDoc(securityDocRef);
 
-                        if (!securityDoc.exists() || securityDoc.data().deletePassword !== password) {
-                            alert('パスワードが違うか、設定されていません。');
+                        let securityDoc;
+                        try {
+                            // パスワード検証用のドキュメント取得に関するエラーハンドリング
+                            securityDoc = await getDoc(securityDocRef);
+                        } catch (error) {
+                            console.error("Error fetching security document:", error);
+                            alert('パスワードの検証に失敗しました。セキュリティ設定ドキュメントの読み取り権限を確認してください。\n\n（注意：本来このドキュメントは公開されるべきではありません）');
                             setIsDeleting(false);
                             return;
                         }
 
+                        if (!securityDoc.exists() || securityDoc.data().deletePassword !== password) {
+                            alert('パスワードが違うか、設定されていません。\n（この機能を使うには、Firestoreの settings/security ドキュメントに deletePassword フィールドを設定する必要があります）');
+                            setIsDeleting(false);
+                            return;
+                        }
+
+                        // 該当担当者のアポイントを検索
                         const collectionName = `${teamId}_appointments`;
                         const appointmentsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
                         const q = query(appointmentsCollectionRef, where("salesPerson", "==", nameToDelete));
-                        
+
                         const querySnapshot = await getDocs(q);
-                        
+
                         if (querySnapshot.empty) {
                             alert(`「${nameToDelete}」さんのアポイントは見つかりませんでした。この名前は過去のアポイントには使用されていないようです。`);
                             setIsDeleting(false);
                             return;
                         }
 
+                        // バッチ処理で担当者名を空文字に更新
                         const batch = writeBatch(db);
                         querySnapshot.forEach((doc) => {
                             batch.update(doc.ref, { salesPerson: "" });
                         });
-                        
+
                         await batch.commit();
                         alert(`「${nameToDelete}」さんの名前を関連アポイント（${querySnapshot.size}件）から削除しました。`);
                     } catch (error) {
                         console.error("Error deleting salesperson:", error);
-                        alert("削除中にエラーが発生しました。権限設定を確認してください。");
+                        // getDocのエラーは上で処理済みのため、ここではバッチ処理などのエラーを捕捉
+                        alert("アポイントからの名前削除中にエラーが発生しました。権限設定を確認してください。");
                     } finally {
                         setIsDeleting(false);
                     }
@@ -616,18 +671,22 @@
                     </div>
                 );
             };
-            
+
             // メインアプリケーションコンポーネント
+            // ここでアプリ全体の状態管理と画面遷移を制御します。
             function App() {
+                // --- 状態管理 (useState) ---
+
+                // Firebaseと認証の状態
                 const [db, setDb] = useState(null);
                 const [user, setUser] = useState(null);
                 const [isAuthReady, setIsAuthReady] = useState(false);
+                // データとローディングの状態
                 const [teamId, setTeamId] = useState('');
                 const [appointments, setAppointments] = useState([]);
                 const [isLoading, setIsLoading] = useState(true);
-                // エラー状態管理
                 const [error, setError] = useState(null);
-                
+
                 // フォームの状態
                 const [customerName, setCustomerName] = useState('');
                 const [contactPerson, setContactPerson] = useState('');
@@ -638,12 +697,12 @@
                 const [purpose, setPurpose] = useState('');
                 const [salesPerson, setSalesPerson] = useState('');
                 const [editingId, setEditingId] = useState(null);
-                const formRef = useRef(null);
-                
+                const formRef = useRef(null); // フォームへの参照（スクロール用）
+
                 // フィルターの状態
                 const [filterDate, setFilterDate] = useState('');
                 const [filterSalesPerson, setFilterSalesPerson] = useState('');
-                
+
                 // モーダルの状態
                 const [isModalOpen, setIsModalOpen] = useState(false);
                 const [modalMessage, setModalMessage] = useState('');
@@ -651,29 +710,32 @@
 
                 // 画面遷移の状態
                 const [currentView, setCurrentView] = useState({ view: 'main', data: null });
-                
+
                 // 担当者と色の管理
                 const [allSalespersons, setAllSalespersons] = useState([]);
                 const [colorMap, setColorMap] = useState({});
 
                 // 使用可能なカラークラスの定義
                 const colorClasses = useMemo(() => [
-                    'bg-sky-50 text-sky-800 border-sky-400',     'bg-emerald-50 text-emerald-800 border-emerald-400',
+                    'bg-sky-50 text-sky-800 border-sky-400',    'bg-emerald-50 text-emerald-800 border-emerald-400',
                     'bg-amber-50 text-amber-800 border-amber-400', 'bg-rose-50 text-rose-800 border-rose-400',
                     'bg-indigo-50 text-indigo-800 border-indigo-400','bg-fuchsia-50 text-fuchsia-800 border-fuchsia-400',
-                    'bg-lime-50 text-lime-800 border-lime-400',     'bg-cyan-50 text-cyan-800 border-cyan-400',
-                    'bg-pink-50 text-pink-800 border-pink-400',     'bg-purple-50 text-purple-800 border-purple-400',
-                    'bg-green-50 text-green-800 border-green-400',   'bg-yellow-50 text-yellow-800 border-yellow-400',
-                    'bg-red-50 text-red-800 border-red-400',       'bg-blue-50 text-blue-800 border-blue-400',
+                    'bg-lime-50 text-lime-800 border-lime-400',    'bg-cyan-50 text-cyan-800 border-cyan-400',
+                    'bg-pink-50 text-pink-800 border-pink-400',    'bg-purple-50 text-purple-800 border-purple-400',
+                    'bg-green-50 text-green-800 border-green-400', 'bg-yellow-50 text-yellow-800 border-yellow-400',
+                    'bg-red-50 text-red-800 border-red-400',     'bg-blue-50 text-blue-800 border-blue-400',
                     'bg-orange-50 text-orange-800 border-orange-400', 'bg-teal-50 text-teal-800 border-teal-400',
                     'bg-violet-50 text-violet-800 border-violet-400', 'bg-gray-200 text-gray-800 border-gray-400'
                 ], []);
 
+                // --- 画面遷移関数 ---
+
+                // 指定されたビューに遷移する関数
                 const navigateTo = useCallback((view, data = null) => {
                     const newState = { view, data };
                     // 状態が変更された場合のみ遷移
                     if (!currentView || currentView.view !== newState.view || JSON.stringify(currentView.data) !== JSON.stringify(newState.data)) {
-                        // 初期ロード時以外はpushState
+                        // 初期ロード時以外はpushState（ブラウザ履歴に追加）
                         if (window.history.state !== null) {
                             window.history.pushState(newState, '');
                         }
@@ -681,7 +743,9 @@
                     }
                 }, [currentView]);
 
-                // ブラウザバック/フォワード対応
+                // --- 副作用処理 (useEffect) ---
+
+                // ブラウザの「戻る」「進む」ボタン対応
                 useEffect(() => {
                     const handlePopState = (event) => {
                         setCurrentView(event.state || { view: 'main', data: null });
@@ -694,13 +758,13 @@
                     return () => window.removeEventListener('popstate', handlePopState);
                 }, []);
 
-                // チームIDの復元
+                // チームIDの復元（LocalStorageから）
                 useEffect(() => {
                     const savedTeamId = localStorage.getItem('sales-app-team-id');
                     if (savedTeamId) setTeamId(savedTeamId);
                 }, []);
 
-                // Firebase初期化と認証 (診断ログを追加)
+                // Firebase初期化と認証
                 useEffect(() => {
                     console.log("[診断ログ8] Firebase初期化・認証開始");
                     try {
@@ -708,15 +772,17 @@
                         const authInstance = getAuth(app);
                         const dbInstance = getFirestore(app);
                         setDb(dbInstance);
+
+                        // 認証状態の監視
                         const unsubscribeAuth = onAuthStateChanged(authInstance, async (currentUser) => {
                             if (!currentUser) {
                                 try {
-                                    // 匿名認証
+                                    // 匿名認証を実行（ユーザー登録不要で利用開始）
                                     await signInAnonymously(authInstance);
                                     console.log("[診断ログ9] 匿名認証成功");
                                 } catch (error) {
                                     console.error("[診断ログ エラーC] 認証失敗:", error);
-                                    setError("認証に失敗しました。Firebaseで匿名認証が有効か確認してください。");
+                                    setError("認証に失敗しました。Firebaseプロジェクトで匿名認証(Anonymous Authentication)が有効になっているか確認してください。");
                                 }
                             }
                             setUser(authInstance.currentUser);
@@ -733,8 +799,10 @@
                 // Firestoreからカラーマップを読み込む
                 useEffect(() => {
                     if (!isAuthReady || !db || !teamId) return;
-                    
+
+                    // カラーマップ設定ドキュメントのパス
                     const colorMapRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', `${teamId}_color_map`);
+                    // リアルタイムで監視
                     const unsubscribe = onSnapshot(colorMapRef, (docSnap) => {
                         if (docSnap.exists()) {
                             setColorMap(docSnap.data() || {});
@@ -748,41 +816,46 @@
                     return () => unsubscribe();
                 }, [isAuthReady, db, teamId]);
 
-                // アポイントメントデータの読み込み (診断ログを追加)
+                // アポイントメントデータの読み込み
                 useEffect(() => {
                     if (!isAuthReady || !db || !teamId) return;
                     console.log("[診断ログ11] アポイントデータ読み込み開始 (TeamID: " + teamId + ")");
                     setIsLoading(true);
                     setError(null); // 読み込み開始時にエラーをリセット
 
+                    // アポイントデータコレクションのパス
                     const collectionName = `${teamId}_appointments`;
                     const appointmentsCollection = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
-                    // visitStartTimestampでソート
+                    // 訪問開始日時で昇順ソート
                     const q = query(appointmentsCollection, orderBy('visitStartTimestamp', 'asc'));
-                    
+
+                    // リアルタイムで監視
                     const unsubscribe = onSnapshot(q, (snapshot) => {
                         const appointmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         setAppointments(appointmentsData);
+                        // 担当者リストを更新
                         const salesPeople = [...new Set(appointmentsData.map(app => app.salesPerson).filter(Boolean))].sort();
                         setAllSalespersons(salesPeople);
                         setIsLoading(false);
                         console.log("[診断ログ12] アポイントデータ読み込み完了 (" + appointmentsData.length + "件)");
                     }, (error) => {
                         console.error("[診断ログ エラーE] データ読み込み失敗:", error);
-                        setError(`データの読み込みに失敗しました。(Team ID: ${teamId})\nFirestoreのセキュリティルールが正しく設定されているか確認してください。\n詳細: ${error.message}`);
+                        setError(`データの読み込みに失敗しました。(Team ID: ${teamId})\nFirestoreのセキュリティルールが正しく設定されているか（匿名ユーザーの読み取りが許可されているか）確認してください。\n詳細: ${error.message}`);
                         setIsLoading(false);
                     });
                     return () => unsubscribe();
                 }, [isAuthReady, db, teamId]);
 
-                // 新しい担当者に色を割り当ててFirestoreに保存する
+                // 新しい担当者に色を自動割り当てし、Firestoreに保存する
                 useEffect(() => {
                     if (!db || !teamId || allSalespersons.length === 0) return;
 
+                    // 色が未割り当ての担当者を抽出
                     const newPersons = allSalespersons.filter(p => p && !colorMap[p]);
                     if (newPersons.length > 0) {
                         const newColorMapUpdates = {};
                         const usedColors = Object.values(colorMap);
+                        // 使用可能な色を抽出
                         let availableColors = colorClasses.filter(c => !usedColors.includes(c));
 
                         newPersons.forEach(person => {
@@ -794,12 +867,16 @@
                             }
                         });
 
+                        // Firestoreに保存
                         const colorMapRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', `${teamId}_color_map`);
+                        // merge: trueで既存の色設定を上書きしないようにする
                         setDoc(colorMapRef, newColorMapUpdates, { merge: true }).catch(error => console.error("Error updating color map:", error));
                     }
                 }, [allSalespersons, colorMap, db, teamId, colorClasses]);
 
-                // フィルタリング処理
+                // --- データ処理ロジック (useMemo) ---
+
+                // フィルタリング処理（メイン画面用）
                 const filteredAppointments = useMemo(() => {
                     const now = new Date();
                     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
@@ -807,25 +884,28 @@
                     return appointments.filter(app => {
                         const appDate = timestampToDate(app.visitStartTimestamp);
                         if (!appDate) return false;
-                        
+
+                        // 今後の予定のみ表示（1時間前以降）
                         const isCurrent = appDate > oneHourAgo;
-                        
+
                         // 日付比較（ローカルタイムゾーンでの比較）
                         const appDateString = `${appDate.getFullYear()}-${('0' + (appDate.getMonth() + 1)).slice(-2)}-${('0' + appDate.getDate()).slice(-2)}`;
                         const dateMatch = !filterDate || (appDateString === filterDate);
-                        
+
+                        // 担当者比較
                         const personMatch = !filterSalesPerson || app.salesPerson === filterSalesPerson;
                         return isCurrent && dateMatch && personMatch;
                     });
                 }, [appointments, filterDate, filterSalesPerson]);
 
-                // --- ハンドラ関数 ---
+                // --- ハンドラ関数（イベント処理） ---
 
                 const handleTeamIdSubmit = (id) => {
-                    localStorage.setItem('sales-app-team-id', id);
+                    localStorage.setItem('sales-app-team-id', id); // 次回アクセスのために保存
                     setTeamId(id);
                 };
 
+                // チームID変更処理
                 const handleChangeTeamId = () => {
                     if (window.confirm('チームIDを変更しますか？\n（入力中の内容は失われます）')) {
                         localStorage.removeItem('sales-app-team-id');
@@ -838,47 +918,50 @@
                     }
                 };
 
+                // 実際のデータ保存処理
                 const proceedWithSubmission = async (appointmentData) => {
                     if (!teamId || !db) return;
                     try {
                         const collectionName = `${teamId}_appointments`;
                         const appointmentsCollection = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
                         if (editingId) {
+                            // 更新処理
                             const docRef = doc(db, 'artifacts', appId, 'public', 'data', collectionName, editingId);
-                            // 更新時はupdatedAtを設定
                             await updateDoc(docRef, {
                                 ...appointmentData,
-                                updatedAt: serverTimestamp()
+                                updatedAt: serverTimestamp() // 更新日時を記録
                             });
                         } else {
-                            // 新規作成時はcreatedAtを設定
+                            // 新規作成処理
                             await addDoc(appointmentsCollection, {
                                 ...appointmentData,
-                                createdAt: serverTimestamp()
+                                createdAt: serverTimestamp() // 作成日時を記録
                             });
                         }
                         resetForm();
-                    } catch (error) { 
-                        console.error("Error saving appointment: ", error); 
-                        alert('アポイントの保存中にエラーが発生しました。権限設定を確認してください。'); 
+                    } catch (error) {
+                        console.error("Error saving appointment: ", error);
+                        alert('アポイントの保存中にエラーが発生しました。Firestoreのセキュリティルールで書き込みが許可されているか確認してください。');
                     }
                 };
 
+                // フォーム送信処理（重複チェックを含む）
                 const handleSubmit = async (e) => {
                     e.preventDefault();
-                    
+
                     // 担当者名の前後の空白を削除
                     const trimmedSalesPerson = salesPerson.trim();
 
+                    // バリデーション
                     if (!customerName || !visitDate || !visitStartTime || !purpose || !trimmedSalesPerson) {
                         alert('必須項目（お名前、訪問日、開始時間、目的、営業担当）を入力してください。');
                         return;
                     }
-                    
+
                     const startTime = new Date(`${visitDate}T${visitStartTime}`);
                     const endTime = visitEndTime ? new Date(`${visitDate}T${visitEndTime}`) : null;
 
-                    // 終了時刻が開始時刻より前の場合はエラーとする
+                    // 終了時刻が開始時刻より前の場合はエラー
                     if (endTime && startTime >= endTime) {
                         alert('終了時間は開始時間より後に設定してください。');
                         return;
@@ -889,44 +972,50 @@
 
                     // 重複チェック
                     const conflictingAppointment = appointments.find(app => {
+                        // 編集中の自身のIDは除外
                         if (editingId && app.id === editingId) return false;
+                        // 担当者が異なる場合は除外
                         if (app.salesPerson !== trimmedSalesPerson) return false;
-                        
+
                         const existingStart = timestampToDate(app.visitStartTimestamp);
                         if (!existingStart) return false;
 
                         // 終了時刻がない場合は1時間とみなして重複チェックを行う
                         const existingEnd = timestampToDate(app.visitEndTimestamp) || new Date(existingStart.getTime() + 60 * 60 * 1000);
-                        
+
                         const newStart = startTime;
                         const newEnd = endTime || new Date(startTime.getTime() + 60 * 60 * 1000);
 
-                        // (StartA < EndB) and (EndA > StartB)
+                        // 時間の重複判定ロジック: (StartA < EndB) and (EndA > StartB)
                         return newStart < existingEnd && newEnd > existingStart;
                     });
 
-                    const appointmentData = { 
-                        customerName, 
-                        contactPerson, 
-                        address, 
-                        visitStartTimestamp: newStartTimestamp, 
-                        visitEndTimestamp: newEndTimestamp, 
-                        purpose, 
-                        salesPerson: trimmedSalesPerson, 
-                        authorId: user?.uid
+                    // 送信するデータ
+                    const appointmentData = {
+                        customerName,
+                        contactPerson,
+                        address,
+                        visitStartTimestamp: newStartTimestamp,
+                        visitEndTimestamp: newEndTimestamp,
+                        purpose,
+                        salesPerson: trimmedSalesPerson,
+                        authorId: user?.uid // 作成者ID（参考情報）
                     };
 
                     if (conflictingAppointment) {
+                        // 重複がある場合はモーダルを表示
                         const { date, time } = formatVisitTime(conflictingAppointment.visitStartTimestamp, conflictingAppointment.visitEndTimestamp);
                         const message = `警告：${trimmedSalesPerson}さんには、指定した時間と重複する別のアポイントが登録されています。\n\n` + `重複アポ: ${conflictingAppointment.customerName} 様\n` + `日時: ${date} ${time}`;
                         setModalMessage(message);
                         setPendingAppointment(appointmentData);
                         setIsModalOpen(true);
                     } else {
+                        // 重複がなければ保存実行
                         await proceedWithSubmission(appointmentData);
                     }
                 };
 
+                // モーダルでの確認後の処理
                 const handleConfirmSubmit = async () => {
                     if (pendingAppointment) await proceedWithSubmission(pendingAppointment);
                     setIsModalOpen(false);
@@ -938,7 +1027,9 @@
                     setPendingAppointment(null);
                 };
 
+                // 編集ボタン押下時の処理
                 const handleEdit = (appointment) => {
+                    // 日付/時刻を<input>タグの形式(YYYY-MM-DD, HH:mm)に変換するヘルパー
                     const toDateInputFormat = (date) => {
                         const year = date.getFullYear();
                         const month = ('0' + (date.getMonth() + 1)).slice(-2);
@@ -958,7 +1049,7 @@
                         setCustomerName(appointment.customerName);
                         setContactPerson(appointment.contactPerson || '');
                         setAddress(appointment.address || '');
-                        
+
                         const startDate = timestampToDate(appointment.visitStartTimestamp);
                         if (startDate) {
                             setVisitDate(toDateInputFormat(startDate));
@@ -967,20 +1058,21 @@
                             setVisitDate('');
                             setVisitStartTime('');
                         }
-                        
+
                         const endDate = timestampToDate(appointment.visitEndTimestamp);
                         setVisitEndTime(endDate ? toTimeInputFormat(endDate) : '');
-                        
+
                         setPurpose(appointment.purpose);
                         setSalesPerson(appointment.salesPerson || '');
-                        
+
                         // フォームまでスクロール
                         if (formRef.current) {
                             formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
                         }
-                    }, 100); // 画面遷移を考慮して少し待つ
+                    }, 100); // 画面遷移のアニメーション等を考慮して少し待つ
                 };
 
+                // 削除ボタン押下時の処理
                 const handleDelete = async (id) => {
                     if (window.confirm('このアポイントを削除してもよろしいですか？')) {
                         if (!db || !teamId) return;
@@ -992,24 +1084,24 @@
                             if (editingId === id) {
                                 resetForm();
                             }
-                        } catch (error) { 
-                            console.error("Error deleting appointment: ", error); 
-                            alert('アポイントの削除中にエラーが発生しました。権限設定を確認してください。'); 
+                        } catch (error) {
+                            console.error("Error deleting appointment: ", error);
+                            alert('アポイントの削除中にエラーが発生しました。権限設定を確認してください。');
                         }
                     }
                 };
 
+                // フォームリセット処理
                 const resetForm = () => {
                     setCustomerName(''); setContactPerson(''); setAddress('');
                     setVisitDate(''); setVisitStartTime(''); setVisitEndTime('');
                     setPurpose(''); setSalesPerson(''); setEditingId(null);
                 };
 
-                // --- レンダリング制御 ---
+                // --- レンダリング（画面表示）制御 ---
 
-                // エラー画面の表示
+                // エラー画面の表示（初期化・認証エラー）
                 if (error && (!isAuthReady || !teamId)) {
-                    // 初期化・認証・TeamID入力前のエラー
                     return (
                         <div className="min-h-screen flex items-center justify-center bg-rose-50 p-4">
                             <div className="bg-white p-8 rounded-xl shadow-xl border border-rose-200 max-w-lg w-full">
@@ -1106,8 +1198,8 @@
                                     )}
                                 </div>
                                 <div className="space-y-5">
-                                    {isLoading ? (<div className="text-center py-10"><p className="text-slate-500">データを読み込み中...</p></div>) : 
-                                    filteredAppointments.length === 0 ? (<div className="text-center py-16 bg-white rounded-xl shadow-sm"><p className="text-slate-500">現在のアポイントはありません。</p><p className="text-slate-400 text-sm mt-2">新しいアポイントを登録してください。</p></div>) : 
+                                    {isLoading ? (<div className="text-center py-10"><p className="text-slate-500">データを読み込み中...</p></div>) :
+                                    filteredAppointments.length === 0 ? (<div className="text-center py-16 bg-white rounded-xl shadow-sm"><p className="text-slate-500">現在のアポイントはありません。</p><p className="text-slate-400 text-sm mt-2">新しいアポイントを登録してください。</p></div>) :
                                     (filteredAppointments.map(app => (<AppointmentCard key={app.id} app={app} onEdit={handleEdit} onDelete={handleDelete} onViewDetails={(person) => navigateTo('detail', person)} />)))}
                                 </div>
                             </div>
@@ -1115,11 +1207,12 @@
                     </div>
                 );
 
+                // 戻る処理（ブラウザバックを利用）
                 const handleBack = useCallback(() => {
                     window.history.back();
                 }, []);
 
-                // 画面ルーティング
+                // 画面ルーティング（表示する画面を切り替える）
                 return (
                     <div className="bg-slate-50 min-h-screen font-sans text-slate-800">
                         <ConfirmationModal isOpen={isModalOpen} message={modalMessage} onConfirm={handleConfirmSubmit} onCancel={handleCancelSubmit} />
@@ -1161,23 +1254,52 @@
             console.log("[診断ログ14] アプリケーション起動処理 完了");
         } // end of startApplication
 
-        // 実行制御ロジック
+        // --- 実行制御ロジック (タイムアウト処理を追加) ---
         // Firebaseの準備完了を待ってアプリケーションを起動する
+
+        const STARTUP_TIMEOUT = 15000; // 15秒のタイムアウトを設定
+        let startupTimeoutId = null;
+
+        // タイムアウト処理
+        startupTimeoutId = setTimeout(() => {
+            // 15秒経ってもFirebaseの準備が完了していない場合
+            if (!window.isFirebaseReady) {
+                console.error(`[診断ログ エラーG] アプリケーション起動タイムアウト (${STARTUP_TIMEOUT}ms)。Firebaseモジュールの読み込みまたは実行に失敗しました。`);
+                // エラー表示
+                const rootElement = document.getElementById('root');
+                if (rootElement) {
+                    rootElement.innerHTML = '<div style="padding: 20px; color: red; text-align: center; margin-top: 50px;"><h3>エラー：アプリケーションの起動がタイムアウトしました。</h3><p>ネットワーク接続やブラウザのセキュリティ設定（サードパーティスクリプトのブロックなど）を確認してください。</p></div>';
+                }
+                // イベントリスナーを解除して、遅れてきたイベントで誤って起動しないようにする
+                window.removeEventListener('FirebaseReady', handleStartup);
+            }
+        }, STARTUP_TIMEOUT);
+
+        // 起動ハンドラ（タイムアウトのクリアとアプリ起動を行う）
+        function handleStartup() {
+            if (startupTimeoutId) {
+                clearTimeout(startupTimeoutId);
+                startupTimeoutId = null;
+            }
+            startApplication();
+        }
+
+
         if (window.isFirebaseReady) {
             // すでに準備完了している場合（Firebaseスクリプトが先に実行された）
             console.log("[診断ログ6.1] Firebaseは準備完了済み。直ちにアプリを起動します。");
-            startApplication();
+            handleStartup();
         } else {
-            // まだ準備が完了していない場合（Reactスクリプトが先に実行された）
+            // まだ準備が完了していない場合（Reactスクリプトが先に実行された可能性がある場合）
             console.log("[診断ログ6.2] Firebase待機中。イベントリスナーを登録します。");
             // ローディング表示を設定
             const rootElement = document.getElementById('root');
-            if (rootElement) {
-                 // Tailwind CSSのクラスはまだ使えない可能性があるため、インラインスタイルで表示
+            if (rootElement && rootElement.innerHTML.includes('読み込み中')) {
+                 // インラインスタイルで表示
                  rootElement.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; color: #94a3b8;">アプリを準備中...</div>';
             }
             // イベントリスナーを登録して待機する ({ once: true } で一度だけ実行)
-            window.addEventListener('FirebaseReady', startApplication, { once: true });
+            window.addEventListener('FirebaseReady', handleStartup, { once: true });
         }
 
     </script>
