@@ -66,12 +66,17 @@
         const EditIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" /></svg>;
         const TargetIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>;
         const SettingsIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
-        
+        const MapPinIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>);
+
         // --- Firebase Config ---
-        // ★★★★★ 修正点: ハードコードされた設定を、環境変数から動的に読み込むように変更 ★★★★★
-        const firebaseConfig = typeof __firebase_config !== 'undefined' 
-            ? JSON.parse(__firebase_config) 
-            : {}; // フォールバック用の空オブジェクト
+        let firebaseConfig = {};
+        try {
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                firebaseConfig = JSON.parse(__firebase_config);
+            }
+        } catch (e) {
+            console.error("Firebase設定の解析に失敗しました:", e);
+        }
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
         // --- Helper Functions ---
@@ -418,6 +423,7 @@
             const { weekId, display } = getWeekInfo(currentDate);
 
             useEffect(() => {
+                if (!db) { setIsLoading(false); return; }
                 setIsLoading(true);
                 const docRef = doc(db, 'artifacts', appId, 'public', 'data', `${teamId}_goals`, weekId);
                 getDoc(docRef).then(docSnap => {
@@ -438,6 +444,7 @@
             };
 
             const handleSave = async () => {
+                if (!db) { alert("データベースに接続されていません。"); return; }
                 setIsSaving(true);
                 const docRef = doc(db, 'artifacts', appId, 'public', 'data', `${teamId}_goals`, weekId);
                 try {
@@ -565,16 +572,18 @@
             }, []);
 
             useEffect(() => {
-                // firebaseConfigが空の場合は初期化しない
-                if (!firebaseConfig.apiKey) {
-                    setIsAuthReady(true); // 認証プロセスをスキップしてUIを表示
+                if (!firebaseConfig || !firebaseConfig.apiKey) {
+                    console.log("Firebase config not found. Running without Firebase.");
+                    setIsAuthReady(true);
                     return;
                 }
+                
                 const app = initializeApp(firebaseConfig);
                 const authInstance = getAuth(app);
                 const dbInstance = getFirestore(app);
                 setAuth(authInstance);
                 setDb(dbInstance);
+
                 const unsubscribeAuth = onAuthStateChanged(authInstance, async (currentUser) => {
                     if (!currentUser) {
                         try {
@@ -592,7 +601,10 @@
             }, []);
             
             useEffect(() => {
-                if (!isAuthReady || !db || !teamId) return;
+                if (!isAuthReady || !db || !teamId) {
+                    setIsLoading(false);
+                    return;
+                };
                 setIsLoading(true);
                 const collectionName = `${teamId}_appointments`;
                 const appointmentsCollection = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
@@ -628,8 +640,9 @@
 
                 setFilteredAppointments(
                     appointments.filter(app => {
-                        const isCurrent = app.visitStartTimestamp?.toDate() > oneHourAgo;
-                        const dateMatch = !filterDate || (app.visitStartTimestamp?.toDate().toISOString().split('T')[0] === filterDate);
+                        if (!app.visitStartTimestamp) return false;
+                        const isCurrent = app.visitStartTimestamp.toDate() > oneHourAgo;
+                        const dateMatch = !filterDate || (app.visitStartTimestamp.toDate().toISOString().split('T')[0] === filterDate);
                         const personMatch = !filterSalesPerson || app.salesPerson === filterSalesPerson;
                         return isCurrent && dateMatch && personMatch;
                     })
@@ -651,7 +664,10 @@
             };
 
             const proceedWithSubmission = async (appointmentData) => {
-                if (!teamId || !db) return;
+                if (!teamId || !db) {
+                     alert("データベースに接続されていません。");
+                     return;
+                }
                 try {
                     const collectionName = `${teamId}_appointments`;
                     const appointmentsCollection = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
@@ -672,15 +688,21 @@
                     return;
                 }
                 const newStartTimestamp = new Date(`${visitDate}T${visitStartTime}`);
-                const newEndTimestamp = visitEndTime ? new Date(`${visitDate}T${visitEndTime}`) : newStartTimestamp;
+                const newEndTimestamp = visitEndTime ? new Date(`${visitDate}T${visitEndTime}`) : null;
+                
                 const conflictingAppointment = appointments.find(app => {
                     if (editingId && app.id === editingId) return false;
                     if (app.salesPerson !== salesPerson) return false;
+                    if (!app.visitStartTimestamp) return false;
+
                     const existingStart = app.visitStartTimestamp.toDate();
                     const existingEnd = app.visitEndTimestamp ? app.visitEndTimestamp.toDate() : existingStart;
-                    return newStartTimestamp < existingEnd && newEndTimestamp > existingStart;
+                    const newEnd = newEndTimestamp || newStartTimestamp;
+                    
+                    return newStartTimestamp < existingEnd && newEnd > existingStart;
                 });
-                const appointmentData = { customerName, contactPerson, address, visitStartTimestamp: newStartTimestamp, visitEndTimestamp: visitEndTime ? new Date(`${visitDate}T${visitEndTime}`) : null, purpose, salesPerson, authorId: user?.uid, createdAt: serverTimestamp() };
+                
+                const appointmentData = { customerName, contactPerson, address, visitStartTimestamp: newStartTimestamp, visitEndTimestamp: newEndTimestamp, purpose, salesPerson, authorId: user?.uid, createdAt: serverTimestamp() };
                 if (conflictingAppointment) {
                     const { date, time } = formatVisitTime(conflictingAppointment.visitStartTimestamp, conflictingAppointment.visitEndTimestamp);
                     const message = `警告：${salesPerson}さんには、同じ日時に別のアポイントが登録されています。\n\n` + `お客様: ${conflictingAppointment.customerName} 様\n` + `日時: ${date} ${time}`;
@@ -742,7 +764,7 @@
             };
             
             const handleAddSalesPerson = async (name) => {
-                if (!db) return;
+                if (!db) { alert("データベースに接続されていません。"); return; }
                 const docRef = doc(db, 'artifacts', appId, 'public', 'data', `${teamId}_sales_people`, name);
                 try {
                     await setDoc(docRef, { name });
@@ -758,7 +780,7 @@
             };
             
             if (!isAuthReady) {
-                 return <div className="text-center p-10">読み込み中...</div>;
+                 return <div className="fixed inset-0 flex items-center justify-center bg-white"><p className="text-slate-500">読み込み中...</p></div>;
             }
             if (!teamId) return <TeamIdEntry onTeamIdSubmit={handleTeamIdSubmit} />;
             
@@ -782,7 +804,10 @@
                                 <div><label htmlFor="customerName" className="block text-sm font-semibold text-slate-700 mb-1">お名前 <span className="text-rose-500">*</span></label><input type="text" id="customerName" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required /></div>
                                 <div>
                                     <label htmlFor="address" className="block text-sm font-semibold text-slate-700 mb-1">住所</label>
-                                    <input type="text" id="address" value={address} onChange={(e) => setAddress(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" />
+                                    <div className="flex items-center space-x-2">
+                                        <input type="text" id="address" value={address} onChange={(e) => setAddress(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" />
+                                        <a href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer" className="p-2.5 bg-slate-100 rounded-lg hover:bg-slate-200 text-slate-600" title="Googleマップを開いて住所を検索"><MapPinIcon /></a>
+                                    </div>
                                 </div>
                                 <div><label htmlFor="contactPerson" className="block text-sm font-semibold text-slate-700 mb-1">その他連絡先など</label><input type="text" id="contactPerson" value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" /></div>
                                 <div><label htmlFor="visitDate" className="block text-sm font-semibold text-slate-700 mb-1">訪問日 <span className="text-rose-500">*</span></label><input type="date" id="visitDate" value={visitDate} onChange={(e) => setVisitDate(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required /></div>
