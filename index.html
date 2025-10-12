@@ -90,7 +90,7 @@
         function startApplication() {
             console.log("[診断ログ7] アプリケーション起動処理(startApplication)を開始します。");
 
-            // 必須ライブラリが利用可能か最終チェック (japaneseHolidaysも追加)
+            // 必須ライブラリが利用可能か最終チェック
             if (!window.Firebase || !window.React || !window.ReactDOM || !window.Firebase.initializeApp || !window.japaneseHolidays) {
                 console.error("[診断ログ エラーB] 必須ライブラリがロードされていません。", {
                     Firebase: !!window.Firebase,
@@ -115,7 +115,6 @@
             const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
             // --- Firebase接続設定 ---
-            // ※重要※ この設定はあなたのFirebaseプロジェクトの設定である必要があります。
             const firebaseConfig = {
                 apiKey: "AIzaSyCqT_s4-XtGBkrX590DfYRQWPEdl-kE5-0",
                 authDomain: "apointo-a72bc.firebaseapp.com",
@@ -218,7 +217,7 @@
             const getDateColorClass = (date) => {
                 if (!date) return 'text-slate-800';
                 try {
-                    // 祝日判定 (japanese-holidaysライブラリを使用。存在は初期化時に確認済み)
+                    // 祝日判定 (japanese-holidaysライブラリを使用)
                     if (typeof window.japaneseHolidays.isHoliday === 'function' && window.japaneseHolidays.isHoliday(date)) {
                         return 'text-rose-600'; // 祝日（赤）
                     }
@@ -233,7 +232,7 @@
 
             // --- コンポーネント定義 ---
 
-            // 確認モーダルコンポーネント（重複登録時などに表示）
+            // 確認モーダルコンポーネント
             const ConfirmationModal = ({ isOpen, message, onConfirm, onCancel }) => {
                 if (!isOpen) return null;
                 return (
@@ -250,7 +249,7 @@
                 );
             };
 
-            // チームID入力画面コンポーネント（初回アクセス時）
+            // チームID入力画面コンポーネント
             const TeamIdEntry = ({ onTeamIdSubmit }) => {
                 const [inputTeamId, setInputTeamId] = useState('');
                 const handleSubmit = (e) => {
@@ -272,16 +271,15 @@
                 );
             };
 
-            // アポイントメントカードコンポーネント（一覧表示の各項目）
+            // アポイントメントカードコンポーネント
             const AppointmentCard = ({ app, onEdit, onDelete, onViewDetails, isDetailPage = false, isPast = false }) => {
                 const { date, time } = formatVisitTime(app.visitStartTimestamp, app.visitEndTimestamp);
 
                 const startDate = timestampToDate(app.visitStartTimestamp);
                 const dateColorClass = getDateColorClass(startDate);
 
-                // Googleカレンダー追加ボタンの処理
                 const handleAddToCalendar = (e) => {
-                    e.stopPropagation(); // カードの他のクリックイベントを妨げないようにする
+                    e.stopPropagation();
                     const url = generateGoogleCalendarLink(app);
                     if (url !== '#') {
                         window.open(url, '_blank', 'noopener,noreferrer');
@@ -290,7 +288,6 @@
                     }
                 };
 
-                // 表示制御ロジック
                 const showDetailsButton = !isDetailPage && !isPast;
                 const showSalesPerson = !isDetailPage || isPast;
 
@@ -298,7 +295,6 @@
                     <div className={`bg-white border border-slate-200 p-5 rounded-xl shadow-sm transition-shadow duration-300 ${!isPast && 'hover:shadow-lg'}`}>
                         <div className="flex justify-between items-start">
                             <div>
-                                {/* 日付表示（詳細ページでは非表示、過去ページでは表示） */}
                                 {(!isDetailPage || isPast) && <p className={`font-semibold ${isPast ? dateColorClass.replace('slate-800', 'slate-500').replace('sky-600', 'sky-500').replace('rose-600', 'rose-500') : dateColorClass}`}>{date}</p>}
                                 <p className={`text-2xl font-bold mt-1 ${isPast ? 'text-slate-500' : 'text-slate-800'}`}>{time}</p>
                             </div>
@@ -327,10 +323,8 @@
             // 詳細ページ（担当者別アポイント一覧）コンポーネント
             const DetailPage = ({ salesPerson, appointments, onBack, onEdit, onDelete, onViewPast }) => {
                 const now = new Date();
-                // 現在時刻の1時間前以降のアポイントを「今後の予定」とする
                 const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
 
-                // 担当者が一致し、今後の予定であるアポイントを抽出・ソート
                 const personAppointments = appointments
                     .filter(app => {
                         const appDate = timestampToDate(app.visitStartTimestamp);
@@ -342,10 +336,7 @@
                 const groupedAppointments = personAppointments.reduce((acc, app) => {
                     const jsDate = timestampToDate(app.visitStartTimestamp);
                     if (!jsDate) return acc;
-
-                    // ローカルタイムで日付キーを生成 (YYYY-MM-DD)
                     const dateKey = `${jsDate.getFullYear()}-${('0' + (jsDate.getMonth() + 1)).slice(-2)}-${('0' + jsDate.getDate()).slice(-2)}`;
-
                     if (!acc[dateKey]) acc[dateKey] = [];
                     acc[dateKey].push(app);
                     return acc;
@@ -372,10 +363,8 @@
                             {sortedDates.length > 0 ? (
                                 <div className="space-y-8">
                                     {sortedDates.map(date => {
-                                        // Dateオブジェクトの生成（ローカルタイムゾーンで解釈）
                                         const [year, month, day] = date.split('-').map(Number);
                                         const dateObj = new Date(year, month - 1, day);
-
                                         const dateOptions = { month: 'long', day: 'numeric', weekday: 'long' };
                                         const formattedDate = new Intl.DateTimeFormat('ja-JP', dateOptions).format(dateObj);
                                         const count = groupedAppointments[date].length;
@@ -410,7 +399,6 @@
                 const now = new Date();
                 const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
 
-                // 過去のアポイントを抽出・降順ソート
                 const pastAppointments = appointments
                     .filter(app => {
                         const appDate = timestampToDate(app.visitStartTimestamp);
@@ -419,7 +407,7 @@
                         const personMatch = !filterPerson || app.salesPerson === filterPerson;
                         return isPast && personMatch;
                     })
-                    // 降順ソート（新しいものが上）
+                    // 降順ソート
                     .sort((a, b) => (timestampToDate(b.visitStartTimestamp)?.getTime() || 0) - (timestampToDate(a.visitStartTimestamp)?.getTime() || 0));
 
                 return (
@@ -456,9 +444,7 @@
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
                     const dayOfWeek = today.getDay();
-                    // 火曜日(2)からの経過日数を計算
                     const daysSinceTuesday = (dayOfWeek + 7 - 2) % 7;
-
                     const tuesday = new Date(today);
                     tuesday.setDate(today.getDate() - daysSinceTuesday);
                     return tuesday;
@@ -466,13 +452,11 @@
 
                 const DEFAULT_COLOR = 'bg-gray-200 text-gray-800 border-gray-400';
 
-                // 担当者の色を取得する関数
                 const getSalespersonColor = useCallback((name) => {
                     if (!name) return DEFAULT_COLOR;
                     return (colorMap && colorMap[name]) || DEFAULT_COLOR;
                 }, [colorMap]);
 
-                // 前の週へ移動
                 const handlePrevWeek = () => {
                     setCurrentWeekStart(prev => {
                         const newDate = new Date(prev);
@@ -481,7 +465,6 @@
                     });
                 };
 
-                // 次の週へ移動
                 const handleNextWeek = () => {
                     setCurrentWeekStart(prev => {
                         const newDate = new Date(prev);
@@ -490,7 +473,6 @@
                     });
                 };
 
-                // 週の日付配列を生成
                 const weekDays = Array.from({ length: 7 }).map((_, i) => {
                     const date = new Date(currentWeekStart);
                     date.setDate(date.getDate() + i);
@@ -500,13 +482,11 @@
                 const weekEnd = new Date(weekDays[6]);
                 weekEnd.setHours(23, 59, 59, 999);
 
-                // 週内のアポイントを抽出
                 const weekAppointments = appointments.filter(app => {
                     const appDate = timestampToDate(app.visitStartTimestamp);
                     return appDate && appDate >= currentWeekStart && appDate <= weekEnd;
                 });
 
-                // 週内に登場する担当者リストを生成
                 const salesPersonsInWeek = [...new Set(weekAppointments.map(app => app.salesPerson).filter(Boolean))].sort();
 
                 return (
@@ -529,12 +509,10 @@
                             </div>
                         </header>
                         <main>
-                            {/* 横スクロール可能なテーブル */}
                             <div className="overflow-x-auto bg-white p-2 rounded-xl shadow-lg">
                                 <table className="w-full border-collapse min-w-[800px]">
                                     <thead>
                                         <tr>
-                                            {/* 担当者列（左端に固定） */}
                                             <th className="p-1 border border-slate-200 w-28 sticky left-0 bg-white/75 backdrop-blur-sm text-xs sm:text-sm z-10">担当者</th>
                                             {weekDays.map(day => (
                                                 <th key={day.toISOString()} className={`p-1 border border-slate-200 text-xs sm:text-sm ${getDateColorClass(day)}`}>
@@ -547,14 +525,12 @@
                                     <tbody>
                                         {salesPersonsInWeek.map(person => (
                                             <tr key={person}>
-                                                {/* 担当者名（左端に固定） */}
                                                 <td className="p-1 border border-slate-200 font-bold align-top sticky left-0 bg-white/75 backdrop-blur-sm text-xs sm:text-sm z-10">
                                                     <button onClick={() => onViewDetails(person)} className="text-sky-600 hover:underline w-full text-left p-1">
                                                         {person}
                                                     </button>
                                                 </td>
                                                 {weekDays.map(day => {
-                                                    // 該当日の担当者のアポイントを抽出・ソート
                                                     const dayAppointments = weekAppointments
                                                         .filter(app => {
                                                             const appDate = timestampToDate(app.visitStartTimestamp);
@@ -587,7 +563,6 @@
             };
 
             // 担当者管理（完全削除）コンポーネント
-            // 注意：この機能は簡易的なパスワード認証を使用しており、セキュリティは高くありません。
             const SalespersonManager = ({ db, teamId, allSalespersons, onClose }) => {
                 const [isDeleting, setIsDeleting] = useState(false);
 
@@ -595,22 +570,19 @@
                     const confirmation = window.confirm(`本当に「${nameToDelete}」さんを完全削除しますか？\n\nこの担当者が設定されている過去の全てのアポイントから名前が削除されます。\nこの操作は元に戻せません。`);
                     if (!confirmation) return;
 
-                    // パスワード入力
                     const password = window.prompt("削除を実行するには、設定したパスワードを入力してください。\n（注意：このパスワード管理機能は簡易的なものです）");
                     if (password === null) return;
 
                     setIsDeleting(true);
                     try {
-                        // パスワード検証（Firestoreの特定のドキュメントと比較）
+                        // パスワード検証
                         const securityDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'security');
-
                         let securityDoc;
                         try {
-                            // パスワード検証用のドキュメント取得に関するエラーハンドリング
                             securityDoc = await getDoc(securityDocRef);
                         } catch (error) {
                             console.error("Error fetching security document:", error);
-                            alert('パスワードの検証に失敗しました。セキュリティ設定ドキュメントの読み取り権限を確認してください。\n\n（注意：本来このドキュメントは公開されるべきではありません）');
+                            alert('パスワードの検証に失敗しました。セキュリティ設定ドキュメントの読み取り権限を確認してください。');
                             setIsDeleting(false);
                             return;
                         }
@@ -644,7 +616,6 @@
                         alert(`「${nameToDelete}」さんの名前を関連アポイント（${querySnapshot.size}件）から削除しました。`);
                     } catch (error) {
                         console.error("Error deleting salesperson:", error);
-                        // getDocのエラーは上で処理済みのため、ここではバッチ処理などのエラーを捕捉
                         alert("アポイントからの名前削除中にエラーが発生しました。権限設定を確認してください。");
                     } finally {
                         setIsDeleting(false);
@@ -672,10 +643,12 @@
                 );
             };
 
+            // --------------------------------------------------
             // メインアプリケーションコンポーネント
-            // ここでアプリ全体の状態管理と画面遷移を制御します。
+            // --------------------------------------------------
             function App() {
-                // --- 状態管理 (useState) ---
+                // --- 状態管理 (useState, useRef) ---
+                // ※重要※ 全てのHooksはコンポーネントの先頭で定義し、条件分岐の中に入れてはいけません。
 
                 // Firebaseと認証の状態
                 const [db, setDb] = useState(null);
@@ -715,6 +688,8 @@
                 const [allSalespersons, setAllSalespersons] = useState([]);
                 const [colorMap, setColorMap] = useState({});
 
+                // --- メモ化 (useMemo, useCallback) ---
+
                 // 使用可能なカラークラスの定義
                 const colorClasses = useMemo(() => [
                     'bg-sky-50 text-sky-800 border-sky-400',    'bg-emerald-50 text-emerald-800 border-emerald-400',
@@ -728,9 +703,7 @@
                     'bg-violet-50 text-violet-800 border-violet-400', 'bg-gray-200 text-gray-800 border-gray-400'
                 ], []);
 
-                // --- 画面遷移関数 ---
-
-                // 指定されたビューに遷移する関数
+                // 画面遷移関数
                 const navigateTo = useCallback((view, data = null) => {
                     const newState = { view, data };
                     // 状態が変更された場合のみ遷移
@@ -742,6 +715,12 @@
                         setCurrentView(newState);
                     }
                 }, [currentView]);
+
+                // 【修正箇所】handleBackの定義を早期リターン(return)の前に移動
+                // 戻る処理（ブラウザバックを利用）
+                const handleBack = useCallback(() => {
+                    window.history.back();
+                }, []);
 
                 // --- 副作用処理 (useEffect) ---
 
@@ -1099,6 +1078,7 @@
                 };
 
                 // --- レンダリング（画面表示）制御 ---
+                // ※重要※ これ以降には絶対にフック（useState, useEffect, useCallbackなど）を記述しないこと！
 
                 // エラー画面の表示（初期化・認証エラー）
                 if (error && (!isAuthReady || !teamId)) {
@@ -1207,11 +1187,6 @@
                     </div>
                 );
 
-                // 戻る処理（ブラウザバックを利用）
-                const handleBack = useCallback(() => {
-                    window.history.back();
-                }, []);
-
                 // 画面ルーティング（表示する画面を切り替える）
                 return (
                     <div className="bg-slate-50 min-h-screen font-sans text-slate-800">
@@ -1255,7 +1230,6 @@
         } // end of startApplication
 
         // --- 実行制御ロジック (タイムアウト処理を追加) ---
-        // Firebaseの準備完了を待ってアプリケーションを起動する
 
         const STARTUP_TIMEOUT = 15000; // 15秒のタイムアウトを設定
         let startupTimeoutId = null;
@@ -1286,11 +1260,11 @@
 
 
         if (window.isFirebaseReady) {
-            // すでに準備完了している場合（Firebaseスクリプトが先に実行された）
+            // すでに準備完了している場合
             console.log("[診断ログ6.1] Firebaseは準備完了済み。直ちにアプリを起動します。");
             handleStartup();
         } else {
-            // まだ準備が完了していない場合（Reactスクリプトが先に実行された可能性がある場合）
+            // まだ準備が完了していない場合
             console.log("[診断ログ6.2] Firebase待機中。イベントリスナーを登録します。");
             // ローディング表示を設定
             const rootElement = document.getElementById('root');
