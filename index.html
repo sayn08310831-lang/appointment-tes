@@ -40,8 +40,9 @@
     <script>console.log("[診断ログ1] 依存ライブラリ(React/Babel) 読み込み開始");</script>
     <script src="https://unpkg.com/react@18/umd/react.development.js" defer></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" defer></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/japanese-holidays@1.0.10/lib/japanese-holidays.min.js" defer></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js" defer></script>
+
     <script>
         // DOMContentLoadedイベントは、deferスクリプトの実行完了後に発生します。
         window.addEventListener('DOMContentLoaded', () => {
@@ -60,8 +61,7 @@
         console.log("[診断ログ3] Firebase SDK (Module) 読み込み開始");
 
         // Firebase SDK v11.6.1 をモジュールとしてインポート
-        // 注意: 静的インポートが失敗した場合（ネットワークエラーなど）、このスクリプト全体の実行が停止します。
-        // その場合、window.isFirebaseReadyは設定されず、React側のタイムアウト処理が動作します。
+        // ※バージョン指定は元のリクエストに合わせています。
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, Timestamp, writeBatch, where, getDoc, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -90,7 +90,8 @@
         function startApplication() {
             console.log("[診断ログ7] アプリケーション起動処理(startApplication)を開始します。");
 
-            // 必須ライブラリが利用可能か最終チェック
+            // 必須ライブラリが利用可能か最終チェック (japaneseHolidaysも追加)
+            // ※読み込み順序を修正したため、この時点で全て揃っているはずです。
             if (!window.Firebase || !window.React || !window.ReactDOM || !window.Firebase.initializeApp || !window.japaneseHolidays) {
                 console.error("[診断ログ エラーB] 必須ライブラリがロードされていません。", {
                     Firebase: !!window.Firebase,
@@ -124,7 +125,6 @@
                 appId: "1:1014142886306:web:c97de02bb5f18b8af652fb",
                 measurementId: "G-XWDNVF3W7V"
             };
-            // アプリケーションID（Firestoreのパスに使用）
             const appId = 'default-app-id';
 
             // --- SVG Icons 定義 ---
@@ -139,7 +139,6 @@
 
             // --- ユーティリティ関数 ---
 
-            // FirestoreのTimestampをJavaScriptのDateオブジェクトに安全に変換する関数
             const timestampToDate = (timestamp) => {
                 if (timestamp && typeof timestamp.toDate === 'function') {
                     try {
@@ -149,14 +148,12 @@
                         return null;
                     }
                 }
-                // オブジェクト形式（{seconds: ..., nanoseconds: ...}）の場合も考慮
                 if (timestamp && typeof timestamp.seconds === 'number') {
                     return new Date(timestamp.seconds * 1000);
                 }
                 return null;
             };
 
-            // 訪問日時をフォーマットする関数
             const formatVisitTime = (startTimestamp, endTimestamp) => {
                 const startDate = timestampToDate(startTimestamp);
                 if (!startDate) return { date: '日時未設定', time: '' };
@@ -174,7 +171,6 @@
                 return { date: dateStr, time: startTimeStr };
             };
 
-            // Googleカレンダーへの予定追加リンクを生成する関数
             const generateGoogleCalendarLink = (app) => {
                 const startDate = timestampToDate(app.visitStartTimestamp);
                 if (!startDate) return '#';
@@ -183,11 +179,9 @@
 
                 let endDate = timestampToDate(app.visitEndTimestamp);
                 if (!endDate) {
-                    // 終了時間未設定時は1時間後と仮定
                     endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
                 }
 
-                // Googleカレンダー用の日時フォーマット (YYYYMMDDTHHmmss) - ローカルタイム
                 const toLocalFormat = (date) => {
                     const YYYY = date.getFullYear();
                     const MM = ('0' + (date.getMonth() + 1)).slice(-2);
@@ -201,38 +195,35 @@
                 const details = `目的: ${app.purpose}\n担当: ${app.salesPerson || '未設定'}\n連絡先: ${app.contactPerson || '未入力'}`;
                 const location = app.address || '';
 
-                // URLを構築
                 const url = new URL('https://www.google.com/calendar/render');
                 url.searchParams.append('action', 'TEMPLATE');
                 url.searchParams.append('text', title);
                 url.searchParams.append('dates', dates);
                 url.searchParams.append('details', details);
                 url.searchParams.append('location', location);
-                // タイムゾーンを指定（重要）
                 url.searchParams.append('ctz', 'Asia/Tokyo');
                 return url.toString();
             };
 
-            // 日付の色（平日、土曜、日曜・祝日）を判定する関数
             const getDateColorClass = (date) => {
                 if (!date) return 'text-slate-800';
                 try {
-                    // 祝日判定 (japanese-holidaysライブラリを使用)
+                    // 祝日判定
+                    // ※このチェックのために、japanese-holidays.min.js が先に読み込まれている必要があります。
                     if (typeof window.japaneseHolidays.isHoliday === 'function' && window.japaneseHolidays.isHoliday(date)) {
-                        return 'text-rose-600'; // 祝日（赤）
+                        return 'text-rose-600';
                     }
                 } catch (e) {
                     console.warn("祝日判定エラー", e);
                 }
                 const day = date.getDay();
-                if (day === 0) return 'text-rose-600'; // 日曜（赤）
-                if (day === 6) return 'text-sky-600'; // 土曜（青）
-                return 'text-slate-800'; // 平日（黒）
+                if (day === 0) return 'text-rose-600';
+                if (day === 6) return 'text-sky-600';
+                return 'text-slate-800';
             };
 
             // --- コンポーネント定義 ---
 
-            // 確認モーダルコンポーネント
             const ConfirmationModal = ({ isOpen, message, onConfirm, onCancel }) => {
                 if (!isOpen) return null;
                 return (
@@ -249,7 +240,6 @@
                 );
             };
 
-            // チームID入力画面コンポーネント
             const TeamIdEntry = ({ onTeamIdSubmit }) => {
                 const [inputTeamId, setInputTeamId] = useState('');
                 const handleSubmit = (e) => {
@@ -271,7 +261,6 @@
                 );
             };
 
-            // アポイントメントカードコンポーネント
             const AppointmentCard = ({ app, onEdit, onDelete, onViewDetails, isDetailPage = false, isPast = false }) => {
                 const { date, time } = formatVisitTime(app.visitStartTimestamp, app.visitEndTimestamp);
 
@@ -320,7 +309,6 @@
                 );
             };
 
-            // 詳細ページ（担当者別アポイント一覧）コンポーネント
             const DetailPage = ({ salesPerson, appointments, onBack, onEdit, onDelete, onViewPast }) => {
                 const now = new Date();
                 const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
@@ -332,7 +320,6 @@
                     })
                     .sort((a, b) => (timestampToDate(a.visitStartTimestamp)?.getTime() || 0) - (timestampToDate(b.visitStartTimestamp)?.getTime() || 0));
 
-                // 日付ごとにグループ化
                 const groupedAppointments = personAppointments.reduce((acc, app) => {
                     const jsDate = timestampToDate(app.visitStartTimestamp);
                     if (!jsDate) return acc;
@@ -394,7 +381,6 @@
                 );
             };
 
-            // 過去のアポイント一覧ページコンポーネント
             const PastAppointmentsPage = ({ appointments, onBack, onEdit, onDelete, title, filterPerson = null }) => {
                 const now = new Date();
                 const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
@@ -407,7 +393,6 @@
                         const personMatch = !filterPerson || app.salesPerson === filterPerson;
                         return isPast && personMatch;
                     })
-                    // 降順ソート
                     .sort((a, b) => (timestampToDate(b.visitStartTimestamp)?.getTime() || 0) - (timestampToDate(a.visitStartTimestamp)?.getTime() || 0));
 
                 return (
@@ -437,9 +422,7 @@
                 );
             };
 
-            // 週間表示ページコンポーネント
             const WeeklyPage = ({ appointments, colorMap, onBack, onViewDetails }) => {
-                // 週の開始日（火曜日始まり）を計算
                 const [currentWeekStart, setCurrentWeekStart] = useState(() => {
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
@@ -562,7 +545,6 @@
                 );
             };
 
-            // 担当者管理（完全削除）コンポーネント
             const SalespersonManager = ({ db, teamId, allSalespersons, onClose }) => {
                 const [isDeleting, setIsDeleting] = useState(false);
 
@@ -575,7 +557,6 @@
 
                     setIsDeleting(true);
                     try {
-                        // パスワード検証
                         const securityDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'security');
                         let securityDoc;
                         try {
@@ -593,7 +574,6 @@
                             return;
                         }
 
-                        // 該当担当者のアポイントを検索
                         const collectionName = `${teamId}_appointments`;
                         const appointmentsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
                         const q = query(appointmentsCollectionRef, where("salesPerson", "==", nameToDelete));
@@ -606,7 +586,6 @@
                             return;
                         }
 
-                        // バッチ処理で担当者名を空文字に更新
                         const batch = writeBatch(db);
                         querySnapshot.forEach((doc) => {
                             batch.update(doc.ref, { salesPerson: "" });
@@ -648,7 +627,7 @@
             // --------------------------------------------------
             function App() {
                 // --- 状態管理 (useState, useRef) ---
-                // ※重要※ 全てのHooksはコンポーネントの先頭で定義し、条件分岐の中に入れてはいけません。
+                // ※重要※ 全てのHooksはコンポーネントの先頭で定義する。
 
                 // Firebaseと認証の状態
                 const [db, setDb] = useState(null);
@@ -670,7 +649,7 @@
                 const [purpose, setPurpose] = useState('');
                 const [salesPerson, setSalesPerson] = useState('');
                 const [editingId, setEditingId] = useState(null);
-                const formRef = useRef(null); // フォームへの参照（スクロール用）
+                const formRef = useRef(null);
 
                 // フィルターの状態
                 const [filterDate, setFilterDate] = useState('');
@@ -690,7 +669,6 @@
 
                 // --- メモ化 (useMemo, useCallback) ---
 
-                // 使用可能なカラークラスの定義
                 const colorClasses = useMemo(() => [
                     'bg-sky-50 text-sky-800 border-sky-400',    'bg-emerald-50 text-emerald-800 border-emerald-400',
                     'bg-amber-50 text-amber-800 border-amber-400', 'bg-rose-50 text-rose-800 border-rose-400',
@@ -703,12 +681,9 @@
                     'bg-violet-50 text-violet-800 border-violet-400', 'bg-gray-200 text-gray-800 border-gray-400'
                 ], []);
 
-                // 画面遷移関数
                 const navigateTo = useCallback((view, data = null) => {
                     const newState = { view, data };
-                    // 状態が変更された場合のみ遷移
                     if (!currentView || currentView.view !== newState.view || JSON.stringify(currentView.data) !== JSON.stringify(newState.data)) {
-                        // 初期ロード時以外はpushState（ブラウザ履歴に追加）
                         if (window.history.state !== null) {
                             window.history.pushState(newState, '');
                         }
@@ -716,20 +691,17 @@
                     }
                 }, [currentView]);
 
-                // 【修正箇所】handleBackの定義を早期リターン(return)の前に移動
-                // 戻る処理（ブラウザバックを利用）
+                // 【Hooksルール対応済み】handleBackの定義を早期リターンの前に配置
                 const handleBack = useCallback(() => {
                     window.history.back();
                 }, []);
 
                 // --- 副作用処理 (useEffect) ---
 
-                // ブラウザの「戻る」「進む」ボタン対応
                 useEffect(() => {
                     const handlePopState = (event) => {
                         setCurrentView(event.state || { view: 'main', data: null });
                     };
-                    // 初期状態の設定
                     if (window.history.state === null) {
                         window.history.replaceState({ view: 'main', data: null }, '');
                     }
@@ -737,7 +709,6 @@
                     return () => window.removeEventListener('popstate', handlePopState);
                 }, []);
 
-                // チームIDの復元（LocalStorageから）
                 useEffect(() => {
                     const savedTeamId = localStorage.getItem('sales-app-team-id');
                     if (savedTeamId) setTeamId(savedTeamId);
@@ -752,11 +723,9 @@
                         const dbInstance = getFirestore(app);
                         setDb(dbInstance);
 
-                        // 認証状態の監視
                         const unsubscribeAuth = onAuthStateChanged(authInstance, async (currentUser) => {
                             if (!currentUser) {
                                 try {
-                                    // 匿名認証を実行（ユーザー登録不要で利用開始）
                                     await signInAnonymously(authInstance);
                                     console.log("[診断ログ9] 匿名認証成功");
                                 } catch (error) {
@@ -775,13 +744,10 @@
                     }
                 }, []);
 
-                // Firestoreからカラーマップを読み込む
+                // データ読み込み関連のuseEffect
                 useEffect(() => {
                     if (!isAuthReady || !db || !teamId) return;
-
-                    // カラーマップ設定ドキュメントのパス
                     const colorMapRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', `${teamId}_color_map`);
-                    // リアルタイムで監視
                     const unsubscribe = onSnapshot(colorMapRef, (docSnap) => {
                         if (docSnap.exists()) {
                             setColorMap(docSnap.data() || {});
@@ -790,72 +756,59 @@
                         }
                     }, (error) => {
                         console.error("Error fetching color map:", error);
-                        // カラーマップの読み込み失敗は致命的ではないため、エラー表示はしない
                     });
                     return () => unsubscribe();
                 }, [isAuthReady, db, teamId]);
 
-                // アポイントメントデータの読み込み
                 useEffect(() => {
                     if (!isAuthReady || !db || !teamId) return;
                     console.log("[診断ログ11] アポイントデータ読み込み開始 (TeamID: " + teamId + ")");
                     setIsLoading(true);
-                    setError(null); // 読み込み開始時にエラーをリセット
+                    setError(null);
 
-                    // アポイントデータコレクションのパス
                     const collectionName = `${teamId}_appointments`;
                     const appointmentsCollection = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
-                    // 訪問開始日時で昇順ソート
                     const q = query(appointmentsCollection, orderBy('visitStartTimestamp', 'asc'));
 
-                    // リアルタイムで監視
                     const unsubscribe = onSnapshot(q, (snapshot) => {
                         const appointmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         setAppointments(appointmentsData);
-                        // 担当者リストを更新
                         const salesPeople = [...new Set(appointmentsData.map(app => app.salesPerson).filter(Boolean))].sort();
                         setAllSalespersons(salesPeople);
                         setIsLoading(false);
                         console.log("[診断ログ12] アポイントデータ読み込み完了 (" + appointmentsData.length + "件)");
                     }, (error) => {
                         console.error("[診断ログ エラーE] データ読み込み失敗:", error);
-                        setError(`データの読み込みに失敗しました。(Team ID: ${teamId})\nFirestoreのセキュリティルールが正しく設定されているか（匿名ユーザーの読み取りが許可されているか）確認してください。\n詳細: ${error.message}`);
+                        setError(`データの読み込みに失敗しました。(Team ID: ${teamId})\nFirestoreのセキュリティルールが正しく設定されているか確認してください。\n詳細: ${error.message}`);
                         setIsLoading(false);
                     });
                     return () => unsubscribe();
                 }, [isAuthReady, db, teamId]);
 
-                // 新しい担当者に色を自動割り当てし、Firestoreに保存する
                 useEffect(() => {
                     if (!db || !teamId || allSalespersons.length === 0) return;
 
-                    // 色が未割り当ての担当者を抽出
                     const newPersons = allSalespersons.filter(p => p && !colorMap[p]);
                     if (newPersons.length > 0) {
                         const newColorMapUpdates = {};
                         const usedColors = Object.values(colorMap);
-                        // 使用可能な色を抽出
                         let availableColors = colorClasses.filter(c => !usedColors.includes(c));
 
                         newPersons.forEach(person => {
                             if (availableColors.length > 0) {
                                 newColorMapUpdates[person] = availableColors.shift();
                             } else {
-                                // 空きがなければランダムに割り当てる
                                 newColorMapUpdates[person] = colorClasses[Math.floor(Math.random() * colorClasses.length)];
                             }
                         });
 
-                        // Firestoreに保存
                         const colorMapRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', `${teamId}_color_map`);
-                        // merge: trueで既存の色設定を上書きしないようにする
                         setDoc(colorMapRef, newColorMapUpdates, { merge: true }).catch(error => console.error("Error updating color map:", error));
                     }
                 }, [allSalespersons, colorMap, db, teamId, colorClasses]);
 
                 // --- データ処理ロジック (useMemo) ---
 
-                // フィルタリング処理（メイン画面用）
                 const filteredAppointments = useMemo(() => {
                     const now = new Date();
                     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
@@ -864,27 +817,23 @@
                         const appDate = timestampToDate(app.visitStartTimestamp);
                         if (!appDate) return false;
 
-                        // 今後の予定のみ表示（1時間前以降）
                         const isCurrent = appDate > oneHourAgo;
 
-                        // 日付比較（ローカルタイムゾーンでの比較）
                         const appDateString = `${appDate.getFullYear()}-${('0' + (appDate.getMonth() + 1)).slice(-2)}-${('0' + appDate.getDate()).slice(-2)}`;
                         const dateMatch = !filterDate || (appDateString === filterDate);
 
-                        // 担当者比較
                         const personMatch = !filterSalesPerson || app.salesPerson === filterSalesPerson;
                         return isCurrent && dateMatch && personMatch;
                     });
                 }, [appointments, filterDate, filterSalesPerson]);
 
-                // --- ハンドラ関数（イベント処理） ---
+                // --- ハンドラ関数（イベント処理）---
 
                 const handleTeamIdSubmit = (id) => {
-                    localStorage.setItem('sales-app-team-id', id); // 次回アクセスのために保存
+                    localStorage.setItem('sales-app-team-id', id);
                     setTeamId(id);
                 };
 
-                // チームID変更処理
                 const handleChangeTeamId = () => {
                     if (window.confirm('チームIDを変更しますか？\n（入力中の内容は失われます）')) {
                         localStorage.removeItem('sales-app-team-id');
@@ -893,28 +842,25 @@
                         setColorMap({});
                         resetForm();
                         navigateTo('main');
-                        setError(null); // エラーもリセット
+                        setError(null);
                     }
                 };
 
-                // 実際のデータ保存処理
                 const proceedWithSubmission = async (appointmentData) => {
                     if (!teamId || !db) return;
                     try {
                         const collectionName = `${teamId}_appointments`;
                         const appointmentsCollection = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
                         if (editingId) {
-                            // 更新処理
                             const docRef = doc(db, 'artifacts', appId, 'public', 'data', collectionName, editingId);
                             await updateDoc(docRef, {
                                 ...appointmentData,
-                                updatedAt: serverTimestamp() // 更新日時を記録
+                                updatedAt: serverTimestamp()
                             });
                         } else {
-                            // 新規作成処理
                             await addDoc(appointmentsCollection, {
                                 ...appointmentData,
-                                createdAt: serverTimestamp() // 作成日時を記録
+                                createdAt: serverTimestamp()
                             });
                         }
                         resetForm();
@@ -924,14 +870,11 @@
                     }
                 };
 
-                // フォーム送信処理（重複チェックを含む）
                 const handleSubmit = async (e) => {
                     e.preventDefault();
 
-                    // 担当者名の前後の空白を削除
                     const trimmedSalesPerson = salesPerson.trim();
 
-                    // バリデーション
                     if (!customerName || !visitDate || !visitStartTime || !purpose || !trimmedSalesPerson) {
                         alert('必須項目（お名前、訪問日、開始時間、目的、営業担当）を入力してください。');
                         return;
@@ -940,7 +883,6 @@
                     const startTime = new Date(`${visitDate}T${visitStartTime}`);
                     const endTime = visitEndTime ? new Date(`${visitDate}T${visitEndTime}`) : null;
 
-                    // 終了時刻が開始時刻より前の場合はエラー
                     if (endTime && startTime >= endTime) {
                         alert('終了時間は開始時間より後に設定してください。');
                         return;
@@ -951,50 +893,39 @@
 
                     // 重複チェック
                     const conflictingAppointment = appointments.find(app => {
-                        // 編集中の自身のIDは除外
                         if (editingId && app.id === editingId) return false;
-                        // 担当者が異なる場合は除外
                         if (app.salesPerson !== trimmedSalesPerson) return false;
 
                         const existingStart = timestampToDate(app.visitStartTimestamp);
                         if (!existingStart) return false;
 
-                        // 終了時刻がない場合は1時間とみなして重複チェックを行う
                         const existingEnd = timestampToDate(app.visitEndTimestamp) || new Date(existingStart.getTime() + 60 * 60 * 1000);
-
                         const newStart = startTime;
                         const newEnd = endTime || new Date(startTime.getTime() + 60 * 60 * 1000);
 
-                        // 時間の重複判定ロジック: (StartA < EndB) and (EndA > StartB)
                         return newStart < existingEnd && newEnd > existingStart;
                     });
 
-                    // 送信するデータ
                     const appointmentData = {
-                        customerName,
-                        contactPerson,
-                        address,
+                        customerName, contactPerson, address,
                         visitStartTimestamp: newStartTimestamp,
                         visitEndTimestamp: newEndTimestamp,
                         purpose,
                         salesPerson: trimmedSalesPerson,
-                        authorId: user?.uid // 作成者ID（参考情報）
+                        authorId: user?.uid
                     };
 
                     if (conflictingAppointment) {
-                        // 重複がある場合はモーダルを表示
                         const { date, time } = formatVisitTime(conflictingAppointment.visitStartTimestamp, conflictingAppointment.visitEndTimestamp);
                         const message = `警告：${trimmedSalesPerson}さんには、指定した時間と重複する別のアポイントが登録されています。\n\n` + `重複アポ: ${conflictingAppointment.customerName} 様\n` + `日時: ${date} ${time}`;
                         setModalMessage(message);
                         setPendingAppointment(appointmentData);
                         setIsModalOpen(true);
                     } else {
-                        // 重複がなければ保存実行
                         await proceedWithSubmission(appointmentData);
                     }
                 };
 
-                // モーダルでの確認後の処理
                 const handleConfirmSubmit = async () => {
                     if (pendingAppointment) await proceedWithSubmission(pendingAppointment);
                     setIsModalOpen(false);
@@ -1006,9 +937,7 @@
                     setPendingAppointment(null);
                 };
 
-                // 編集ボタン押下時の処理
                 const handleEdit = (appointment) => {
-                    // 日付/時刻を<input>タグの形式(YYYY-MM-DD, HH:mm)に変換するヘルパー
                     const toDateInputFormat = (date) => {
                         const year = date.getFullYear();
                         const month = ('0' + (date.getMonth() + 1)).slice(-2);
@@ -1017,12 +946,10 @@
                     };
                     const toTimeInputFormat = (date) => `${('0'+date.getHours()).slice(-2)}:${('0'+date.getMinutes()).slice(-2)}`;
 
-                    // メイン画面に戻る
                     if (currentView.view !== 'main') {
                         navigateTo('main');
                     }
 
-                    // 画面遷移後にフォームを設定するためにsetTimeoutを使用
                     setTimeout(() => {
                         setEditingId(appointment.id);
                         setCustomerName(appointment.customerName);
@@ -1044,14 +971,12 @@
                         setPurpose(appointment.purpose);
                         setSalesPerson(appointment.salesPerson || '');
 
-                        // フォームまでスクロール
                         if (formRef.current) {
                             formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
                         }
-                    }, 100); // 画面遷移のアニメーション等を考慮して少し待つ
+                    }, 100);
                 };
 
-                // 削除ボタン押下時の処理
                 const handleDelete = async (id) => {
                     if (window.confirm('このアポイントを削除してもよろしいですか？')) {
                         if (!db || !teamId) return;
@@ -1059,7 +984,6 @@
                             const collectionName = `${teamId}_appointments`;
                             const docRef = doc(db, 'artifacts', appId, 'public', 'data', collectionName, id);
                             await deleteDoc(docRef);
-                            // 削除したものが編集中のものだった場合、フォームをリセット
                             if (editingId === id) {
                                 resetForm();
                             }
@@ -1070,7 +994,6 @@
                     }
                 };
 
-                // フォームリセット処理
                 const resetForm = () => {
                     setCustomerName(''); setContactPerson(''); setAddress('');
                     setVisitDate(''); setVisitStartTime(''); setVisitEndTime('');
@@ -1078,7 +1001,7 @@
                 };
 
                 // --- レンダリング（画面表示）制御 ---
-                // ※重要※ これ以降には絶対にフック（useState, useEffect, useCallbackなど）を記述しないこと！
+                // ※重要※ これ以降には絶対にフックを記述しないこと！
 
                 // エラー画面の表示（初期化・認証エラー）
                 if (error && (!isAuthReady || !teamId)) {
@@ -1122,7 +1045,7 @@
                             <p className="text-slate-500 mt-2">チームID: <span className="font-semibold text-sky-600">{teamId}</span></p>
                             <button onClick={handleChangeTeamId} className="absolute top-0 right-0 text-xs text-slate-500 hover:text-sky-600 underline">ID変更</button>
                         </header>
-                        {/* フォーム部分をstickyにして操作性を向上 */}
+
                         <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                             <div ref={formRef} className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-lg h-fit lg:sticky lg:top-6">
                                 <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
@@ -1142,7 +1065,6 @@
                                     </div>
                                     <div>
                                         <label htmlFor="salesPerson" className="block text-sm font-semibold text-slate-700 mb-1">営業担当 <span className="text-rose-500">*</span></label>
-                                        {/* 入力値はそのまま保持し、送信時にtrimする */}
                                         <input type="text" list="salespersons-list" id="salesPerson" value={salesPerson} onChange={(e) => setSalesPerson(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required />
                                         <datalist id="salespersons-list">
                                             {allSalespersons.map(person => <option key={person} value={person} />)}
@@ -1187,7 +1109,7 @@
                     </div>
                 );
 
-                // 画面ルーティング（表示する画面を切り替える）
+                // 画面ルーティング
                 return (
                     <div className="bg-slate-50 min-h-screen font-sans text-slate-800">
                         <ConfirmationModal isOpen={isModalOpen} message={modalMessage} onConfirm={handleConfirmSubmit} onCancel={handleCancelSubmit} />
@@ -1217,7 +1139,6 @@
             const rootElement = document.getElementById('root');
             if (rootElement) {
                 const root = ReactDOM.createRoot(rootElement);
-                // 開発中の問題を検出しやすくするためにStrictModeを使用
                 root.render(
                     <React.StrictMode>
                         <App />
@@ -1229,27 +1150,24 @@
             console.log("[診断ログ14] アプリケーション起動処理 完了");
         } // end of startApplication
 
-        // --- 実行制御ロジック (タイムアウト処理を追加) ---
+        // --- 実行制御ロジック (タイムアウト処理) ---
 
-        const STARTUP_TIMEOUT = 15000; // 15秒のタイムアウトを設定
+        const STARTUP_TIMEOUT = 15000; // 15秒
         let startupTimeoutId = null;
 
         // タイムアウト処理
         startupTimeoutId = setTimeout(() => {
-            // 15秒経ってもFirebaseの準備が完了していない場合
             if (!window.isFirebaseReady) {
-                console.error(`[診断ログ エラーG] アプリケーション起動タイムアウト (${STARTUP_TIMEOUT}ms)。Firebaseモジュールの読み込みまたは実行に失敗しました。`);
-                // エラー表示
+                console.error(`[診断ログ エラーG] アプリケーション起動タイムアウト (${STARTUP_TIMEOUT}ms)。`);
                 const rootElement = document.getElementById('root');
                 if (rootElement) {
-                    rootElement.innerHTML = '<div style="padding: 20px; color: red; text-align: center; margin-top: 50px;"><h3>エラー：アプリケーションの起動がタイムアウトしました。</h3><p>ネットワーク接続やブラウザのセキュリティ設定（サードパーティスクリプトのブロックなど）を確認してください。</p></div>';
+                    rootElement.innerHTML = '<div style="padding: 20px; color: red; text-align: center; margin-top: 50px;"><h3>エラー：アプリケーションの起動がタイムアウトしました。</h3><p>ネットワーク接続やブラウザのセキュリティ設定を確認してください。</p></div>';
                 }
-                // イベントリスナーを解除して、遅れてきたイベントで誤って起動しないようにする
                 window.removeEventListener('FirebaseReady', handleStartup);
             }
         }, STARTUP_TIMEOUT);
 
-        // 起動ハンドラ（タイムアウトのクリアとアプリ起動を行う）
+        // 起動ハンドラ
         function handleStartup() {
             if (startupTimeoutId) {
                 clearTimeout(startupTimeoutId);
@@ -1260,19 +1178,14 @@
 
 
         if (window.isFirebaseReady) {
-            // すでに準備完了している場合
             console.log("[診断ログ6.1] Firebaseは準備完了済み。直ちにアプリを起動します。");
             handleStartup();
         } else {
-            // まだ準備が完了していない場合
             console.log("[診断ログ6.2] Firebase待機中。イベントリスナーを登録します。");
-            // ローディング表示を設定
             const rootElement = document.getElementById('root');
             if (rootElement && rootElement.innerHTML.includes('読み込み中')) {
-                 // インラインスタイルで表示
                  rootElement.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; color: #94a3b8;">アプリを準備中...</div>';
             }
-            // イベントリスナーを登録して待機する ({ once: true } で一度だけ実行)
             window.addEventListener('FirebaseReady', handleStartup, { once: true });
         }
 
