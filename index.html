@@ -26,7 +26,13 @@
       }
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&libraries=places&language=ja"></script>
+    <script>
+        // Google Maps API を非同期ロード
+        window.initMap = function() {
+            window.googleMapsLoaded = true;
+        };
+    </script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&libraries=places&language=ja&callback=initMap"></script>
     <style>
         body { font-family: 'Noto Sans JP', sans-serif; }
     </style>
@@ -183,11 +189,24 @@
             const mapInstanceRef = useRef(null);
             const autocompleteRef = useRef(null);
             const inputRef = useRef(null);
+            const [mapsLoaded, setMapsLoaded] = useState(false);
 
             useEffect(() => {
-                if (!isOpen || !mapRef.current || mapInstanceRef.current) return;
+                // Google Maps APIの読み込みを待つ
+                const checkGoogleMaps = setInterval(() => {
+                    if (window.google && window.google.maps) {
+                        setMapsLoaded(true);
+                        clearInterval(checkGoogleMaps);
+                    }
+                }, 100);
+                return () => clearInterval(checkGoogleMaps);
+            }, []);
 
-                const map = new google.maps.Map(mapRef.current, {
+            useEffect(() => {
+                if (!isOpen || !mapRef.current || mapInstanceRef.current || !mapsLoaded) return;
+
+                try {
+                    const map = new google.maps.Map(mapRef.current, {
                     center: { lat: 35.6812, lng: 139.7671 },
                     zoom: 15,
                 });
@@ -239,9 +258,22 @@
                 map.addListener('click', (e) => {
                     updateAddress(e.latLng);
                 });
-            }, [isOpen]);
+                } catch (error) {
+                    console.error('Google Maps initialization error:', error);
+                }
+            }, [isOpen, mapsLoaded]);
 
             if (!isOpen) return null;
+            
+            if (!mapsLoaded) {
+                return (
+                    <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
+                        <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full text-center">
+                            <p className="text-slate-600">地図を読み込んでいます...</p>
+                        </div>
+                    </div>
+                );
+            }
 
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
