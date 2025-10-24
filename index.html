@@ -747,7 +747,7 @@
             useEffect(() => {
                 if (!isAuthReady || !db || !teamId) return;
                 
-                const salesPeopleDocRef = doc(db, 'artifacts', appId, 'public', 'data', `${teamId}_salespeople`);
+                const salesPeopleDocRef = doc(db, `teams/${teamId}/settings/salespeople`);
                 const unsubscribe = onSnapshot(salesPeopleDocRef, (docSnap) => {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
@@ -766,8 +766,7 @@
             useEffect(() => {
                 if (!isAuthReady || !db || !teamId) return;
                 setIsLoading(true);
-                const collectionName = `${teamId}_appointments`;
-                const appointmentsCollection = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
+                const appointmentsCollection = collection(db, `teams/${teamId}/appointments`);
                 const q = query(appointmentsCollection, orderBy('visitStartTimestamp', 'asc'));
                 const unsubscribe = onSnapshot(q, (snapshot) => {
                     const appointmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -816,7 +815,7 @@
                     return;
                 }
                 try {
-                    const salesPeopleDocRef = doc(db, 'artifacts', appId, 'public', 'data', `${teamId}_salespeople`);
+                    const salesPeopleDocRef = doc(db, `teams/${teamId}/settings/salespeople`);
                     await setDoc(salesPeopleDocRef, {
                         people: [...registeredSalesPeople, name],
                         updatedAt: serverTimestamp()
@@ -839,7 +838,7 @@
                 if (!window.confirm(`${name}さんを削除してもよろしいですか？`)) return;
 
                 try {
-                    const salesPeopleDocRef = doc(db, 'artifacts', appId, 'public', 'data', `${teamId}_salespeople`);
+                    const salesPeopleDocRef = doc(db, `teams/${teamId}/settings/salespeople`);
                     await setDoc(salesPeopleDocRef, {
                         people: registeredSalesPeople.filter(p => p !== name),
                         updatedAt: serverTimestamp()
@@ -853,10 +852,9 @@
             const proceedWithSubmission = async (appointmentData) => {
                 if (!teamId) return;
                 try {
-                    const collectionName = `${teamId}_appointments`;
-                    const appointmentsCollection = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
+                    const appointmentsCollection = collection(db, `teams/${teamId}/appointments`);
                     if (editingId) {
-                        const docRef = doc(db, 'artifacts', appId, 'public', 'data', collectionName, editingId);
+                        const docRef = doc(db, `teams/${teamId}/appointments/${editingId}`);
                         await updateDoc(docRef, appointmentData);
                     } else {
                         await addDoc(appointmentsCollection, appointmentData);
@@ -932,8 +930,7 @@
             const handleDelete = async (id) => {
                 if (window.confirm('このアポイントを削除してもよろしいですか？')) {
                     try {
-                        const collectionName = `${teamId}_appointments`;
-                        const docRef = doc(db, 'artifacts', appId, 'public', 'data', collectionName, id);
+                        const docRef = doc(db, `teams/${teamId}/appointments/${id}`);
                         await deleteDoc(docRef);
                     } catch (error) { console.error("Error deleting appointment: ", error); alert('アポイントの削除中にエラーが発生しました。'); }
                 }
