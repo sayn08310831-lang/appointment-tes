@@ -142,10 +142,17 @@
         // 週の開始日（火曜日）を取得
         const getWeekStart = (date) => {
             const d = new Date(date);
-            const day = d.getDay();
-            const diff = day === 0 ? -6 : 1 - day; // 火曜日を週の始まりに
-            d.setDate(d.getDate() + diff + 1);
             d.setHours(0, 0, 0, 0);
+            const day = d.getDay(); // 0:日曜 1:月曜 2:火曜 ... 6:土曜
+            // 火曜日(2)を週の開始とする
+            // 火曜: 0, 水曜: -1, 木曜: -2, 金曜: -3, 土曜: -4, 日曜: -5, 月曜: -6
+            let diff;
+            if (day === 2) diff = 0;      // 火曜日
+            else if (day > 2) diff = 2 - day;  // 水〜土
+            else if (day === 0) diff = -5;     // 日曜
+            else diff = 2 - day - 7;           // 月曜
+            
+            d.setDate(d.getDate() + diff);
             return d;
         };
 
@@ -203,64 +210,96 @@
             }, []);
 
             useEffect(() => {
-                if (!isOpen || !mapRef.current || mapInstanceRef.current || !mapsLoaded) return;
+                if (!isOpen || !mapRef.current || !mapsLoaded) return;
+                
+                // モーダルが閉じられたらマップインスタンスをクリア
+                if (!isOpen && mapInstanceRef.current) {
+                    mapInstanceRef.current = null;
+                    autocompleteRef.current = null;
+                    return;
+                }
+
+                // 既にマップが初期化されている場合はスキップ
+                if (mapInstanceRef.current) return;
 
                 try {
                     const map = new google.maps.Map(mapRef.current, {
-                    center: { lat: 35.6812, lng: 139.7671 },
-                    zoom: 15,
-                });
-                mapInstanceRef.current = map;
-
-                const marker = new google.maps.Marker({
-                    map: map,
-                    draggable: true,
-                });
-
-                const geocoder = new google.maps.Geocoder();
-
-                const updateAddress = (location) => {
-                    marker.setPosition(location);
-                    map.panTo(location);
-                    geocoder.geocode({ location: location }, (results, status) => {
-                        if (status === 'OK' && results[0]) {
-                            inputRef.current.value = results[0].formatted_address;
-                        }
+                        center: { lat: 35.6812, lng: 139.7671 },
+                        zoom: 15,
                     });
-                };
+                    mapInstanceRef.current = map;
 
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition((position) => {
-                        const pos = {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude,
-                        };
-                        updateAddress(pos);
+                    const marker = new google.maps.Marker({
+                        map: map,
+                        draggable: true,
+                        position: { lat: 35.6812, lng: 139.7671 }
                     });
-                }
 
-                const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
-                    componentRestrictions: { country: 'jp' },
-                });
-                autocomplete.bindTo('bounds', map);
-                autocompleteRef.current = autocomplete;
+                    const geocoder = new google.maps.Geocoder();
 
-                autocomplete.addListener('place_changed', () => {
-                    const place = autocomplete.getPlace();
-                    if (!place.geometry || !place.geometry.location) return;
-                    updateAddress(place.geometry.location);
-                });
+                    const updateAddress = (location) => {
+                        marker.setPosition(location);
+                        map.panTo(location);
+                        geocoder.geocode({ location: location }, (results, status) => {
+                            if (status === 'OK' && results[0] && inputRef.current) {
+                                inputRef.current.value = results[0].formatted_address;
+                            }
+                        });
+                    };
 
-                marker.addListener('dragend', () => {
-                    updateAddress(marker.getPosition());
-                });
+                    // 現在地取得
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                            (position) => {
+                                const pos = {
+                                    lat: position.coords.latitude,
+                                    lng: position.coords.longitude,
+                                };
+                                updateAddress(pos);
+                            },
+                            (error) => {
+                                console.log('Geolocation error:', error);
+                                // エラーでもデフォルト位置でマーカーを表示
+                                updateAddress({ lat: 35.6812, lng: 139.7671 });
+                            }
+                        );
+                    } else {
+                        updateAddress({ lat: 35.6812, lng: 139.7671 });
+                    }
 
-                map.addListener('click', (e) => {
-                    updateAddress(e.latLng);
-                });
+                    // Autocomplete
+                    if (inputRef.current) {
+                        const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
+                            componentRestrictions: { country: 'jp' },
+                        });
+                        autocomplete.bindTo('bounds', map);
+                        autocompleteRef.current = autocomplete;
+
+                        autocomplete.addListener('place_changed', () => {
+                            const place = autocomplete.getPlace();
+                            if (!place.geometry || !place.geometry.location) return;
+                            updateAddress(place.geometry.location);
+                        });
+                    }
+
+                    marker.addListener('dragend', () => {
+                        updateAddress(marker.getPosition());
+                    });
+
+                    map.addListener('click', (e) => {
+                        updateAddress(e.latLng);
+                    });
                 } catch (error) {
                     console.error('Google Maps initialization error:', error);
                 }
+                
+                return () => {
+                    // クリーンアップ
+                    if (!isOpen) {
+                        mapInstanceRef.current = null;
+                        autocompleteRef.current = null;
+                    }
+                };
             }, [isOpen, mapsLoaded]);
 
             if (!isOpen) return null;
@@ -496,25 +535,27 @@
             );
         };
         
-        // 週間表示ページ
+        // 週間表示ページ（全員分）
         const WeeklyViewPage = ({ salesPerson, appointments, onBack, onEdit, onDelete }) => {
             const [currentWeekStart, setCurrentWeekStart] = useState(() => getWeekStart(new Date()));
 
             const weekEnd = getWeekEnd(currentWeekStart);
             
+            // 全員分のアポイントを取得（salesPersonパラメータは無視）
             const weekAppointments = appointments
                 .filter(app => {
-                    if (app.salesPerson !== salesPerson) return false;
                     const appDate = app.visitStartTimestamp.toDate();
                     return appDate >= currentWeekStart && appDate <= weekEnd;
                 })
                 .sort((a, b) => a.visitStartTimestamp.seconds - b.visitStartTimestamp.seconds);
 
+            // 日付ごとにグループ化（担当者別にさらにグループ化）
             const groupedByDay = weekAppointments.reduce((acc, app) => {
                 const jsDate = app.visitStartTimestamp.toDate();
                 const dateKey = jsDate.toISOString().split('T')[0];
-                if (!acc[dateKey]) acc[dateKey] = [];
-                acc[dateKey].push(app);
+                if (!acc[dateKey]) acc[dateKey] = {};
+                if (!acc[dateKey][app.salesPerson]) acc[dateKey][app.salesPerson] = [];
+                acc[dateKey][app.salesPerson].push(app);
                 return acc;
             }, {});
 
@@ -549,7 +590,7 @@
                             <BackIcon />
                             詳細に戻る
                         </button>
-                        <h1 className="text-3xl sm:text-4xl font-bold text-slate-800">{salesPerson}さんの週間アポイント</h1>
+                        <h1 className="text-3xl sm:text-4xl font-bold text-slate-800">チーム全体の週間アポイント</h1>
                         <div className="flex items-center justify-between mt-4">
                             <p className="text-slate-500">{formatWeekRange(currentWeekStart)}</p>
                             <div className="flex space-x-2">
@@ -563,7 +604,8 @@
                         <div className="space-y-6">
                             {weekDays.map(day => {
                                 const dateKey = day.toISOString().split('T')[0];
-                                const dayAppointments = groupedByDay[dateKey] || [];
+                                const dayAppointmentsBySalesPerson = groupedByDay[dateKey] || {};
+                                const totalCount = Object.values(dayAppointmentsBySalesPerson).reduce((sum, apps) => sum + apps.length, 0);
                                 const dateOptions = { month: 'long', day: 'numeric', weekday: 'long' };
                                 const formattedDate = new Intl.DateTimeFormat('ja-JP', dateOptions).format(day);
                                 const dateColorClass = getDateColorClass(day);
@@ -574,12 +616,19 @@
                                         <h2 className={`text-lg font-bold mb-3 pb-2 border-b ${dateColorClass}`}>
                                             {formattedDate}
                                             {isToday && <span className="ml-2 text-sm bg-sky-600 text-white px-2 py-1 rounded">今日</span>}
-                                            <span className="text-sm font-medium text-slate-500 ml-3">({dayAppointments.length}件)</span>
+                                            <span className="text-sm font-medium text-slate-500 ml-3">({totalCount}件)</span>
                                         </h2>
-                                        {dayAppointments.length > 0 ? (
-                                            <div className="space-y-3">
-                                                {dayAppointments.map(app => (
-                                                    <AppointmentCard key={app.id} app={app} onEdit={onEdit} onDelete={onDelete} isDetailPage={true} />
+                                        {totalCount > 0 ? (
+                                            <div className="space-y-4">
+                                                {Object.entries(dayAppointmentsBySalesPerson).map(([person, apps]) => (
+                                                    <div key={person} className="border-l-4 border-sky-500 pl-4">
+                                                        <h3 className="font-bold text-slate-700 mb-2">{person}さん ({apps.length}件)</h3>
+                                                        <div className="space-y-3">
+                                                            {apps.map(app => (
+                                                                <AppointmentCard key={app.id} app={app} onEdit={onEdit} onDelete={onDelete} isDetailPage={true} />
+                                                            ))}
+                                                        </div>
+                                                    </div>
                                                 ))}
                                             </div>
                                         ) : (
@@ -962,6 +1011,9 @@
                         <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-800">アポイント共有</h1>
                         <p className="text-slate-500 mt-2">チームID: <span className="font-semibold text-sky-600">{teamId}</span></p>
                         <div className="absolute top-0 right-0 flex space-x-2">
+                            <button onClick={() => navigateToView('weekly')} className="text-sm font-semibold text-green-600 hover:text-green-800 transition px-3 py-1 rounded" title="週間表示">
+                                📅 週間表示
+                            </button>
                             <button onClick={() => setIsSalesPersonModalOpen(true)} className="p-2 text-slate-500 hover:text-sky-600 transition" title="担当者管理">
                                 <SettingsIcon />
                             </button>
