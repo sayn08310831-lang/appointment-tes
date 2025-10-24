@@ -667,11 +667,18 @@
             const [viewHistory, setViewHistory] = useState(['main']);
 
             // ブラウザの戻るボタン対応
+            const viewHistoryRef = useRef(viewHistory);
+            
+            useEffect(() => {
+                viewHistoryRef.current = viewHistory;
+            }, [viewHistory]);
+
             useEffect(() => {
                 const handlePopState = (e) => {
                     e.preventDefault();
-                    if (viewHistory.length > 1) {
-                        const newHistory = [...viewHistory];
+                    const currentHistory = viewHistoryRef.current;
+                    if (currentHistory.length > 1) {
+                        const newHistory = [...currentHistory];
                         newHistory.pop();
                         const previousView = newHistory[newHistory.length - 1];
                         setViewHistory(newHistory);
@@ -680,12 +687,16 @@
                 };
 
                 window.addEventListener('popstate', handlePopState);
-                window.history.pushState({ view: 'main' }, '');
+                
+                // 初回のみhistoryにpushする
+                if (window.history.state === null) {
+                    window.history.pushState({ view: 'main' }, '');
+                }
 
                 return () => {
                     window.removeEventListener('popstate', handlePopState);
                 };
-            }, [viewHistory]);
+            }, []); // 依存配列を空にして初回のみ実行
 
             const navigateToView = (newView, person = null) => {
                 setView(newView);
