@@ -26,6 +26,13 @@
       }
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <script>
+        // Google Maps API を非同期ロード
+        window.initMap = function() {
+            window.googleMapsLoaded = true;
+        };
+    </script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&libraries=places&language=ja&callback=initMap"></script>
     <style>
         body { font-family: 'Noto Sans JP', sans-serif; }
     </style>
@@ -40,30 +47,30 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         window.Firebase = {
             initializeApp,
             getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken,
-            getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp
+            getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, setDoc
         };
     </script>
 
-    <!-- ★★★★★ 修正点1: data-type="module" を追加 ★★★★★ -->
     <script type="text/babel" data-type="module">
         const { initializeApp } = window.Firebase;
         const { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } = window.Firebase;
-        const { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp } = window.Firebase;
+        const { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, setDoc } = window.Firebase;
         const { useState, useEffect, useRef } = React;
 
-        // --- SVG Icons (変更なし) ---
+        // --- SVG Icons ---
         const UserIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>;
         const LocationIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>;
         const BackIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" /></svg>;
         const CalendarPlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zM5 8a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm1 5a1 1 0 100-2 1 1 0 000 2zm3 0a1 1 0 100-2 1 1 0 000 2zm3 0a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /><path d="M13 14a1 1 0 100 2h3a1 1 0 100-2h-3z" /></svg>;
         const InfoIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 inline-block text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>;
+        const MapIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline-block" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12 1.586l-4 4v12.828l4-4V1.586zM3.707 3.293A1 1 0 002 4v10a1 1 0 00.293.707L6 18.414V5.586L3.707 3.293zM17.707 5.293L14 1.586v12.828l2.293 2.293A1 1 0 0018 16V6a1 1 0 00-.293-.707z" clipRule="evenodd" /></svg>;
+        const SettingsIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>;
 
-        // ★★★★★ 修正点2: あなたの正しいFirebase Configに修正 ★★★★★
         const firebaseConfig = {
             apiKey: "AIzaSyCqT_s4-XtGBkrX590DfYRQWPEdl-kE5-0",
             authDomain: "apointo-a72bc.firebaseapp.com",
@@ -98,7 +105,7 @@
             if (app.visitEndTimestamp) {
                 endDate = app.visitEndTimestamp.toDate();
             } else {
-                endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // Default to 1 hour
+                endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
             }
             const toLocalFormat = (date) => {
                 const YYYY = date.getFullYear();
@@ -127,9 +134,43 @@
                 return 'text-rose-600';
             }
             const day = date.getDay();
-            if (day === 0) return 'text-rose-600'; // Sunday
-            if (day === 6) return 'text-sky-600';   // Saturday
-            return 'text-slate-800'; // Weekday
+            if (day === 0) return 'text-rose-600';
+            if (day === 6) return 'text-sky-600';
+            return 'text-slate-800';
+        };
+
+        // 週の開始日（火曜日）を取得
+        const getWeekStart = (date) => {
+            const d = new Date(date);
+            d.setHours(0, 0, 0, 0);
+            const day = d.getDay(); // 0:日曜 1:月曜 2:火曜 ... 6:土曜
+            // 火曜日(2)を週の開始とする
+            // 火曜: 0, 水曜: -1, 木曜: -2, 金曜: -3, 土曜: -4, 日曜: -5, 月曜: -6
+            let diff;
+            if (day === 2) diff = 0;      // 火曜日
+            else if (day > 2) diff = 2 - day;  // 水〜土
+            else if (day === 0) diff = -5;     // 日曜
+            else diff = 2 - day - 7;           // 月曜
+            
+            d.setDate(d.getDate() + diff);
+            return d;
+        };
+
+        // 週の終了日（月曜日）を取得
+        const getWeekEnd = (date) => {
+            const start = getWeekStart(date);
+            const end = new Date(start);
+            end.setDate(end.getDate() + 6);
+            end.setHours(23, 59, 59, 999);
+            return end;
+        };
+
+        // 週の表示用フォーマット
+        const formatWeekRange = (startDate) => {
+            const endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + 6);
+            const format = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
+            return `${format(startDate)}(火) - ${format(endDate)}(月)`;
         };
 
         // --- Components ---
@@ -143,6 +184,216 @@
                         <div className="flex justify-center space-x-4">
                             <button onClick={onCancel} className="w-full px-4 py-2.5 bg-slate-200 text-slate-800 font-semibold rounded-lg hover:bg-slate-300 transition focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2">キャンセル</button>
                             <button onClick={onConfirm} className="w-full px-4 py-2.5 bg-rose-600 text-white font-semibold rounded-lg hover:bg-rose-700 transition focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2">このまま登録</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Google Maps 住所選択モーダル
+        const AddressModal = ({ isOpen, onSelect, onCancel }) => {
+            const mapRef = useRef(null);
+            const mapInstanceRef = useRef(null);
+            const autocompleteRef = useRef(null);
+            const inputRef = useRef(null);
+            const [mapsLoaded, setMapsLoaded] = useState(false);
+
+            useEffect(() => {
+                // Google Maps APIの読み込みを待つ
+                const checkGoogleMaps = setInterval(() => {
+                    if (window.google && window.google.maps) {
+                        setMapsLoaded(true);
+                        clearInterval(checkGoogleMaps);
+                    }
+                }, 100);
+                return () => clearInterval(checkGoogleMaps);
+            }, []);
+
+            useEffect(() => {
+                if (!isOpen || !mapRef.current || !mapsLoaded) return;
+                
+                // モーダルが閉じられたらマップインスタンスをクリア
+                if (!isOpen && mapInstanceRef.current) {
+                    mapInstanceRef.current = null;
+                    autocompleteRef.current = null;
+                    return;
+                }
+
+                // 既にマップが初期化されている場合はスキップ
+                if (mapInstanceRef.current) return;
+
+                try {
+                    const map = new google.maps.Map(mapRef.current, {
+                        center: { lat: 35.6812, lng: 139.7671 },
+                        zoom: 15,
+                    });
+                    mapInstanceRef.current = map;
+
+                    const marker = new google.maps.Marker({
+                        map: map,
+                        draggable: true,
+                        position: { lat: 35.6812, lng: 139.7671 }
+                    });
+
+                    const geocoder = new google.maps.Geocoder();
+
+                    const updateAddress = (location) => {
+                        marker.setPosition(location);
+                        map.panTo(location);
+                        geocoder.geocode({ location: location }, (results, status) => {
+                            if (status === 'OK' && results[0] && inputRef.current) {
+                                inputRef.current.value = results[0].formatted_address;
+                            }
+                        });
+                    };
+
+                    // 現在地取得
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                            (position) => {
+                                const pos = {
+                                    lat: position.coords.latitude,
+                                    lng: position.coords.longitude,
+                                };
+                                updateAddress(pos);
+                            },
+                            (error) => {
+                                console.log('Geolocation error:', error);
+                                // エラーでもデフォルト位置でマーカーを表示
+                                updateAddress({ lat: 35.6812, lng: 139.7671 });
+                            }
+                        );
+                    } else {
+                        updateAddress({ lat: 35.6812, lng: 139.7671 });
+                    }
+
+                    // Autocomplete
+                    if (inputRef.current) {
+                        const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
+                            componentRestrictions: { country: 'jp' },
+                        });
+                        autocomplete.bindTo('bounds', map);
+                        autocompleteRef.current = autocomplete;
+
+                        autocomplete.addListener('place_changed', () => {
+                            const place = autocomplete.getPlace();
+                            if (!place.geometry || !place.geometry.location) return;
+                            updateAddress(place.geometry.location);
+                        });
+                    }
+
+                    marker.addListener('dragend', () => {
+                        updateAddress(marker.getPosition());
+                    });
+
+                    map.addListener('click', (e) => {
+                        updateAddress(e.latLng);
+                    });
+                } catch (error) {
+                    console.error('Google Maps initialization error:', error);
+                }
+                
+                return () => {
+                    // クリーンアップ
+                    if (!isOpen) {
+                        mapInstanceRef.current = null;
+                        autocompleteRef.current = null;
+                    }
+                };
+            }, [isOpen, mapsLoaded]);
+
+            if (!isOpen) return null;
+            
+            if (!mapsLoaded) {
+                return (
+                    <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
+                        <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full text-center">
+                            <p className="text-slate-600">地図を読み込んでいます...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-auto">
+                        <h3 className="text-xl font-bold text-slate-800 mb-4">住所を選択</h3>
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            placeholder="住所を検索..."
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 mb-4"
+                        />
+                        <div ref={mapRef} className="w-full h-96 rounded-lg mb-4"></div>
+                        <p className="text-sm text-slate-600 mb-4">マップをクリックするか、マーカーをドラッグして位置を調整できます</p>
+                        <div className="flex justify-end space-x-4">
+                            <button onClick={onCancel} className="px-4 py-2 bg-slate-200 text-slate-800 font-semibold rounded-lg hover:bg-slate-300 transition">キャンセル</button>
+                            <button onClick={() => onSelect(inputRef.current?.value || '')} className="px-4 py-2 bg-sky-600 text-white font-semibold rounded-lg hover:bg-sky-700 transition">この住所を使用</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 担当者管理モーダル
+        const SalesPersonManagementModal = ({ isOpen, salesPeople, onAdd, onDelete, onClose }) => {
+            const [newPerson, setNewPerson] = useState('');
+
+            const handleAdd = () => {
+                if (newPerson.trim()) {
+                    onAdd(newPerson.trim());
+                    setNewPerson('');
+                }
+            };
+
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full max-h-[80vh] overflow-auto">
+                        <h3 className="text-xl font-bold text-slate-800 mb-4">担当者管理</h3>
+                        
+                        <div className="mb-6">
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">新しい担当者を追加</label>
+                            <div className="flex space-x-2">
+                                <input
+                                    type="text"
+                                    value={newPerson}
+                                    onChange={(e) => setNewPerson(e.target.value)}
+                                    onKeyPress={(e) => e.key === 'Enter' && handleAdd()}
+                                    placeholder="担当者名"
+                                    className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500"
+                                />
+                                <button onClick={handleAdd} className="px-4 py-2 bg-sky-600 text-white font-semibold rounded-lg hover:bg-sky-700 transition">追加</button>
+                            </div>
+                        </div>
+
+                        <div className="mb-6">
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">登録済み担当者</label>
+                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                                {salesPeople.length === 0 ? (
+                                    <p className="text-slate-500 text-sm">担当者が登録されていません</p>
+                                ) : (
+                                    salesPeople.map((person) => (
+                                        <div key={person} className="flex items-center justify-between bg-slate-50 p-3 rounded-lg">
+                                            <span className="font-medium text-slate-800">{person}</span>
+                                            <button
+                                                onClick={() => onDelete(person)}
+                                                className="p-1 text-rose-500 hover:bg-rose-100 rounded transition"
+                                                title="削除"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clipRule="evenodd" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end">
+                            <button onClick={onClose} className="px-6 py-2 bg-slate-200 text-slate-800 font-semibold rounded-lg hover:bg-slate-300 transition">閉じる</button>
                         </div>
                     </div>
                 </div>
@@ -209,7 +460,7 @@
             );
         };
 
-        const DetailPage = ({ salesPerson, appointments, onBack, onEdit, onDelete, onViewPast }) => {
+        const DetailPage = ({ salesPerson, appointments, onBack, onEdit, onDelete, onViewPast, onViewWeekly }) => {
             const now = new Date();
             const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
             
@@ -238,9 +489,14 @@
                                 <BackIcon />
                                 一覧に戻る
                             </button>
-                            <button onClick={onViewPast} className="text-sm font-semibold text-sky-600 hover:text-sky-800 transition mb-4">
-                                過去のアポを見る →
-                            </button>
+                            <div className="flex space-x-2 mb-4">
+                                <button onClick={onViewWeekly} className="text-sm font-semibold text-green-600 hover:text-green-800 transition">
+                                    週間表示 →
+                                </button>
+                                <button onClick={onViewPast} className="text-sm font-semibold text-sky-600 hover:text-sky-800 transition">
+                                    過去のアポ →
+                                </button>
+                            </div>
                         </div>
                         <h1 className="text-3xl sm:text-4xl font-bold text-slate-800">{salesPerson}さんのアポイント</h1>
                         <p className="text-slate-500 mt-2">{personAppointments.length}件の今後の予定があります</p>
@@ -279,6 +535,114 @@
             );
         };
         
+        // 週間表示ページ（全員分）
+        const WeeklyViewPage = ({ salesPerson, appointments, onBack, onEdit, onDelete }) => {
+            const [currentWeekStart, setCurrentWeekStart] = useState(() => getWeekStart(new Date()));
+
+            const weekEnd = getWeekEnd(currentWeekStart);
+            
+            // 全員分のアポイントを取得（salesPersonパラメータは無視）
+            const weekAppointments = appointments
+                .filter(app => {
+                    const appDate = app.visitStartTimestamp.toDate();
+                    return appDate >= currentWeekStart && appDate <= weekEnd;
+                })
+                .sort((a, b) => a.visitStartTimestamp.seconds - b.visitStartTimestamp.seconds);
+
+            // 日付ごとにグループ化（担当者別にさらにグループ化）
+            const groupedByDay = weekAppointments.reduce((acc, app) => {
+                const jsDate = app.visitStartTimestamp.toDate();
+                const dateKey = jsDate.toISOString().split('T')[0];
+                if (!acc[dateKey]) acc[dateKey] = {};
+                if (!acc[dateKey][app.salesPerson]) acc[dateKey][app.salesPerson] = [];
+                acc[dateKey][app.salesPerson].push(app);
+                return acc;
+            }, {});
+
+            const goToPreviousWeek = () => {
+                const newStart = new Date(currentWeekStart);
+                newStart.setDate(newStart.getDate() - 7);
+                setCurrentWeekStart(newStart);
+            };
+
+            const goToNextWeek = () => {
+                const newStart = new Date(currentWeekStart);
+                newStart.setDate(newStart.getDate() + 7);
+                setCurrentWeekStart(newStart);
+            };
+
+            const goToCurrentWeek = () => {
+                setCurrentWeekStart(getWeekStart(new Date()));
+            };
+
+            // 火曜から月曜までの7日間を生成
+            const weekDays = [];
+            for (let i = 0; i < 7; i++) {
+                const day = new Date(currentWeekStart);
+                day.setDate(day.getDate() + i);
+                weekDays.push(day);
+            }
+
+            return (
+                <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+                    <header className="mb-8">
+                        <button onClick={onBack} className="flex items-center text-slate-600 hover:text-slate-900 font-semibold transition mb-4">
+                            <BackIcon />
+                            詳細に戻る
+                        </button>
+                        <h1 className="text-3xl sm:text-4xl font-bold text-slate-800">チーム全体の週間アポイント</h1>
+                        <div className="flex items-center justify-between mt-4">
+                            <p className="text-slate-500">{formatWeekRange(currentWeekStart)}</p>
+                            <div className="flex space-x-2">
+                                <button onClick={goToPreviousWeek} className="px-3 py-1 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition">← 前週</button>
+                                <button onClick={goToCurrentWeek} className="px-3 py-1 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition">今週</button>
+                                <button onClick={goToNextWeek} className="px-3 py-1 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition">次週 →</button>
+                            </div>
+                        </div>
+                    </header>
+                    <main>
+                        <div className="space-y-6">
+                            {weekDays.map(day => {
+                                const dateKey = day.toISOString().split('T')[0];
+                                const dayAppointmentsBySalesPerson = groupedByDay[dateKey] || {};
+                                const totalCount = Object.values(dayAppointmentsBySalesPerson).reduce((sum, apps) => sum + apps.length, 0);
+                                const dateOptions = { month: 'long', day: 'numeric', weekday: 'long' };
+                                const formattedDate = new Intl.DateTimeFormat('ja-JP', dateOptions).format(day);
+                                const dateColorClass = getDateColorClass(day);
+                                const isToday = day.toDateString() === new Date().toDateString();
+
+                                return (
+                                    <section key={dateKey} className={`bg-white rounded-xl shadow-sm p-5 ${isToday ? 'ring-2 ring-sky-500' : ''}`}>
+                                        <h2 className={`text-lg font-bold mb-3 pb-2 border-b ${dateColorClass}`}>
+                                            {formattedDate}
+                                            {isToday && <span className="ml-2 text-sm bg-sky-600 text-white px-2 py-1 rounded">今日</span>}
+                                            <span className="text-sm font-medium text-slate-500 ml-3">({totalCount}件)</span>
+                                        </h2>
+                                        {totalCount > 0 ? (
+                                            <div className="space-y-4">
+                                                {Object.entries(dayAppointmentsBySalesPerson).map(([person, apps]) => (
+                                                    <div key={person} className="border-l-4 border-sky-500 pl-4">
+                                                        <h3 className="font-bold text-slate-700 mb-2">{person}さん ({apps.length}件)</h3>
+                                                        <div className="space-y-3">
+                                                            {apps.map(app => (
+                                                                <AppointmentCard key={app.id} app={app} onEdit={onEdit} onDelete={onDelete} isDetailPage={true} />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-slate-400 text-sm py-4">アポイントはありません</p>
+                                        )}
+                                    </section>
+                                );
+                            })}
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
         const PastAppointmentsPage = ({ appointments, onBack, onEdit, onDelete, title, filterPerson = null }) => {
             const now = new Date();
             const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
@@ -341,11 +705,65 @@
             const [filterDate, setFilterDate] = useState('');
             const [filterSalesPerson, setFilterSalesPerson] = useState('');
             const [uniqueSalesPeople, setUniqueSalesPeople] = useState([]);
+            const [registeredSalesPeople, setRegisteredSalesPeople] = useState([]);
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [modalMessage, setModalMessage] = useState('');
             const [pendingAppointment, setPendingAppointment] = useState(null);
-            const [view, setView] = useState('main'); // 'main', 'detail', 'past_all', 'past_personal'
+            const [view, setView] = useState('main');
             const [selectedSalesPerson, setSelectedSalesPerson] = useState(null);
+            const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+            const [isSalesPersonModalOpen, setIsSalesPersonModalOpen] = useState(false);
+            const [viewHistory, setViewHistory] = useState(['main']);
+
+            // ブラウザの戻るボタン対応
+            const viewHistoryRef = useRef(viewHistory);
+            
+            useEffect(() => {
+                viewHistoryRef.current = viewHistory;
+            }, [viewHistory]);
+
+            useEffect(() => {
+                const handlePopState = (e) => {
+                    e.preventDefault();
+                    const currentHistory = viewHistoryRef.current;
+                    if (currentHistory.length > 1) {
+                        const newHistory = [...currentHistory];
+                        newHistory.pop();
+                        const previousView = newHistory[newHistory.length - 1];
+                        setViewHistory(newHistory);
+                        setView(previousView);
+                    }
+                };
+
+                window.addEventListener('popstate', handlePopState);
+                
+                // 初回のみhistoryにpushする
+                if (window.history.state === null) {
+                    window.history.pushState({ view: 'main' }, '');
+                }
+
+                return () => {
+                    window.removeEventListener('popstate', handlePopState);
+                };
+            }, []); // 依存配列を空にして初回のみ実行
+
+            const navigateToView = (newView, person = null) => {
+                setView(newView);
+                if (person) setSelectedSalesPerson(person);
+                setViewHistory([...viewHistory, newView]);
+                window.history.pushState({ view: newView }, '');
+            };
+
+            const navigateBack = () => {
+                if (viewHistory.length > 1) {
+                    const newHistory = [...viewHistory];
+                    newHistory.pop();
+                    const previousView = newHistory[newHistory.length - 1];
+                    setViewHistory(newHistory);
+                    setView(previousView);
+                    window.history.back();
+                }
+            };
 
             useEffect(() => {
                 const savedTeamId = localStorage.getItem('sales-app-team-id');
@@ -373,6 +791,26 @@
                 });
                 return () => unsubscribeAuth();
             }, []);
+
+            // 担当者リストの購読
+            useEffect(() => {
+                if (!isAuthReady || !db || !teamId) return;
+                
+                const salesPeopleDocRef = doc(db, 'teams', teamId, 'settings', 'salespeople');
+                const unsubscribe = onSnapshot(salesPeopleDocRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        setRegisteredSalesPeople(data.people || []);
+                    } else {
+                        setRegisteredSalesPeople([]);
+                    }
+                }, (error) => {
+                    console.error("Error fetching sales people:", error);
+                    setRegisteredSalesPeople([]);
+                });
+                
+                return () => unsubscribe();
+            }, [isAuthReady, db, teamId]);
 
             useEffect(() => {
                 if (!isAuthReady || !db || !teamId) return;
@@ -417,6 +855,47 @@
                     localStorage.removeItem('sales-app-team-id');
                     setTeamId('');
                     resetForm();
+                }
+            };
+
+            const handleAddSalesPerson = async (name) => {
+                if (!teamId || !db) return;
+                if (registeredSalesPeople.includes(name)) {
+                    alert('この担当者は既に登録されています。');
+                    return;
+                }
+                try {
+                    const salesPeopleDocRef = doc(db, 'teams', teamId, 'settings', 'salespeople');
+                    await setDoc(salesPeopleDocRef, {
+                        people: [...registeredSalesPeople, name],
+                        updatedAt: serverTimestamp()
+                    });
+                } catch (error) {
+                    console.error("Error adding sales person:", error);
+                    alert('担当者の追加中にエラーが発生しました。');
+                }
+            };
+
+            const handleDeleteSalesPerson = async (name) => {
+                if (!teamId || !db) return;
+                
+                const hasAppointments = appointments.some(app => app.salesPerson === name);
+                if (hasAppointments) {
+                    alert('この担当者にはアポイントが登録されているため削除できません。');
+                    return;
+                }
+
+                if (!window.confirm(`${name}さんを削除してもよろしいですか？`)) return;
+
+                try {
+                    const salesPeopleDocRef = doc(db, 'teams', teamId, 'settings', 'salespeople');
+                    await setDoc(salesPeopleDocRef, {
+                        people: registeredSalesPeople.filter(p => p !== name),
+                        updatedAt: serverTimestamp()
+                    });
+                } catch (error) {
+                    console.error("Error deleting sales person:", error);
+                    alert('担当者の削除中にエラーが発生しました。');
                 }
             };
 
@@ -483,6 +962,7 @@
                 const toTimeInputFormat = (date) => `${('0'+date.getHours()).slice(-2)}:${('0'+date.getMinutes()).slice(-2)}`;
                 
                 setView('main');
+                setViewHistory(['main']);
                 setTimeout(() => {
                     setEditingId(appointment.id);
                     setCustomerName(appointment.customerName);
@@ -515,8 +995,12 @@
             };
             
             const handleViewDetails = (person) => {
-                setSelectedSalesPerson(person);
-                setView('detail');
+                navigateToView('detail', person);
+            };
+
+            const handleAddressSelect = (selectedAddress) => {
+                setAddress(selectedAddress);
+                setIsAddressModalOpen(false);
             };
 
             if (!teamId) return <TeamIdEntry onTeamIdSubmit={handleTeamIdSubmit} />;
@@ -526,21 +1010,52 @@
                     <header className="text-center mb-10 relative">
                         <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-800">アポイント共有</h1>
                         <p className="text-slate-500 mt-2">チームID: <span className="font-semibold text-sky-600">{teamId}</span></p>
-                        <button onClick={handleChangeTeamId} className="absolute top-0 right-0 text-xs text-slate-500 hover:text-sky-600 underline">ID変更</button>
+                        <div className="absolute top-0 right-0 flex space-x-2">
+                            <button onClick={() => navigateToView('weekly')} className="text-sm font-semibold text-green-600 hover:text-green-800 transition px-3 py-1 rounded" title="週間表示">
+                                📅 週間表示
+                            </button>
+                            <button onClick={() => setIsSalesPersonModalOpen(true)} className="p-2 text-slate-500 hover:text-sky-600 transition" title="担当者管理">
+                                <SettingsIcon />
+                            </button>
+                            <button onClick={handleChangeTeamId} className="text-xs text-slate-500 hover:text-sky-600 underline">ID変更</button>
+                        </div>
                     </header>
                     <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <div ref={formRef} className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-lg h-fit">
                             <h2 className="text-2xl font-bold mb-6 border-b border-slate-200 pb-4">{editingId ? 'アポイント編集' : '新規アポイント登録'}</h2>
                             <form onSubmit={handleSubmit} className="space-y-5">
                                 <div><label htmlFor="customerName" className="block text-sm font-semibold text-slate-700 mb-1">お名前 <span className="text-rose-500">*</span></label><input type="text" id="customerName" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required /></div>
-                                <div><label htmlFor="address" className="block text-sm font-semibold text-slate-700 mb-1">住所</label><input type="text" id="address" value={address} onChange={(e) => setAddress(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" /></div>
+                                <div>
+                                    <label htmlFor="address" className="block text-sm font-semibold text-slate-700 mb-1">住所</label>
+                                    <div className="flex space-x-2">
+                                        <input type="text" id="address" value={address} onChange={(e) => setAddress(e.target.value)} className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" />
+                                        <button type="button" onClick={() => setIsAddressModalOpen(true)} className="px-3 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition flex items-center" title="地図から選択">
+                                            <MapIcon />
+                                        </button>
+                                    </div>
+                                </div>
                                 <div><label htmlFor="contactPerson" className="block text-sm font-semibold text-slate-700 mb-1">その他連絡先など</label><input type="text" id="contactPerson" value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" /></div>
                                 <div><label htmlFor="visitDate" className="block text-sm font-semibold text-slate-700 mb-1">訪問日 <span className="text-rose-500">*</span></label><input type="date" id="visitDate" value={visitDate} onChange={(e) => setVisitDate(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required /></div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div><label htmlFor="visitStartTime" className="block text-sm font-semibold text-slate-700 mb-1">開始時間 <span className="text-rose-500">*</span></label><input type="time" id="visitStartTime" value={visitStartTime} onChange={(e) => setVisitStartTime(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required /></div>
                                     <div><label htmlFor="visitEndTime" className="block text-sm font-semibold text-slate-700 mb-1">終了時間</label><input type="time" id="visitEndTime" value={visitEndTime} onChange={(e) => setVisitEndTime(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" /></div>
                                 </div>
-                                <div><label htmlFor="salesPerson" className="block text-sm font-semibold text-slate-700 mb-1">営業担当 <span className="text-rose-500">*</span></label><input type="text" id="salesPerson" value={salesPerson} onChange={(e) => setSalesPerson(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required /></div>
+                                <div>
+                                    <label htmlFor="salesPerson" className="block text-sm font-semibold text-slate-700 mb-1">営業担当 <span className="text-rose-500">*</span></label>
+                                    {registeredSalesPeople.length > 0 ? (
+                                        <select id="salesPerson" value={salesPerson} onChange={(e) => setSalesPerson(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition bg-white" required>
+                                            <option value="">選択してください</option>
+                                            {registeredSalesPeople.map(person => (
+                                                <option key={person} value={person}>{person}</option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <div>
+                                            <input type="text" id="salesPerson" value={salesPerson} onChange={(e) => setSalesPerson(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required />
+                                            <p className="text-xs text-slate-500 mt-1">担当者管理から担当者を追加すると選択式になります</p>
+                                        </div>
+                                    )}
+                                </div>
                                 <div><label htmlFor="purpose" className="block text-sm font-semibold text-slate-700 mb-1">目的・商談内容 <span className="text-rose-500">*</span></label><textarea id="purpose" value={purpose} onChange={(e) => setPurpose(e.target.value)} rows="4" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" required></textarea></div>
                                 <div className="flex items-center space-x-4 pt-2">
                                     <button type="submit" className="w-full bg-sky-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-transform transform hover:scale-105 shadow-lg">{editingId ? '更新する' : '登録する'}</button>
@@ -552,7 +1067,7 @@
                             <div className="bg-white p-5 rounded-2xl shadow-lg mb-6">
                                 <div className="flex justify-between items-center mb-4">
                                   <h3 className="text-xl font-bold text-slate-800">絞り込み</h3>
-                                  <button onClick={() => setView('past_all')} className="text-sm font-semibold text-sky-600 hover:text-sky-800 transition">チームの過去アポ →</button>
+                                  <button onClick={() => navigateToView('past_all')} className="text-sm font-semibold text-sky-600 hover:text-sky-800 transition">チームの過去アポ →</button>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
                                     <div><label htmlFor="filterDate" className="block text-sm font-medium text-slate-700 mb-1">訪問日</label><input type="date" id="filterDate" value={filterDate} onChange={e => setFilterDate(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition"/></div>
@@ -573,10 +1088,19 @@
             return (
                 <div className="bg-slate-50 min-h-screen font-sans text-slate-800">
                     <ConfirmationModal isOpen={isModalOpen} message={modalMessage} onConfirm={handleConfirmSubmit} onCancel={handleCancelSubmit} />
+                    <AddressModal isOpen={isAddressModalOpen} onSelect={handleAddressSelect} onCancel={() => setIsAddressModalOpen(false)} />
+                    <SalesPersonManagementModal 
+                        isOpen={isSalesPersonModalOpen} 
+                        salesPeople={registeredSalesPeople}
+                        onAdd={handleAddSalesPerson}
+                        onDelete={handleDeleteSalesPerson}
+                        onClose={() => setIsSalesPersonModalOpen(false)}
+                    />
                     {view === 'main' && mainView}
-                    {view === 'detail' && <DetailPage salesPerson={selectedSalesPerson} appointments={appointments} onBack={() => setView('main')} onEdit={handleEdit} onDelete={handleDelete} onViewPast={() => setView('past_personal')} />}
-                    {view === 'past_all' && <PastAppointmentsPage appointments={appointments} onBack={() => setView('main')} onEdit={handleEdit} onDelete={handleDelete} title="チームの過去アポイント" />}
-                    {view === 'past_personal' && <PastAppointmentsPage appointments={appointments} onBack={() => setView('detail')} onEdit={handleEdit} onDelete={handleDelete} title={`${selectedSalesPerson}さんの過去アポイント`} filterPerson={selectedSalesPerson} />}
+                    {view === 'detail' && <DetailPage salesPerson={selectedSalesPerson} appointments={appointments} onBack={navigateBack} onEdit={handleEdit} onDelete={handleDelete} onViewPast={() => navigateToView('past_personal')} onViewWeekly={() => navigateToView('weekly')} />}
+                    {view === 'weekly' && <WeeklyViewPage salesPerson={selectedSalesPerson} appointments={appointments} onBack={navigateBack} onEdit={handleEdit} onDelete={handleDelete} />}
+                    {view === 'past_all' && <PastAppointmentsPage appointments={appointments} onBack={navigateBack} onEdit={handleEdit} onDelete={handleDelete} title="チームの過去アポイント" />}
+                    {view === 'past_personal' && <PastAppointmentsPage appointments={appointments} onBack={navigateBack} onEdit={handleEdit} onDelete={handleDelete} title={`${selectedSalesPerson}さんの過去アポイント`} filterPerson={selectedSalesPerson} />}
                 </div>
             );
         }
@@ -584,7 +1108,6 @@
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
-    <!-- ↓↓↓ このブロック全体を </body> タグの直前に挿入 ↓↓↓ -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
